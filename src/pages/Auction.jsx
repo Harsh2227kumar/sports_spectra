@@ -90,6 +90,11 @@ function Auction() {
             })
             .subscribe();
 
+        // Polling fallback every 5s in case Realtime is not enabled on the table
+        const pollInterval = setInterval(() => {
+            fetchSupabasePlayers(true);
+        }, 5000);
+
         // Local storage listener for manual changes in Admin tab (fallback)
         const loadPlayers = () => {
             const currentData = localStorage.getItem('auctionPlayers') || '[]';
@@ -98,6 +103,7 @@ function Auction() {
         window.addEventListener('storage', loadPlayers);
 
         return () => {
+            clearInterval(pollInterval);
             window.removeEventListener('storage', loadPlayers);
             supabase.removeChannel(subscription);
         };

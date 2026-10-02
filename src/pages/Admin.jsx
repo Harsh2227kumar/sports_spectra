@@ -70,7 +70,13 @@ function Admin() {
             })
             .subscribe();
 
+        // Polling fallback every 5s in case Realtime is not enabled
+        const pollInterval = setInterval(() => {
+            loadPlayers();
+        }, 5000);
+
         return () => {
+            clearInterval(pollInterval);
             window.removeEventListener('storage', loadPlayers);
             supabase.removeChannel(channel);
         };
