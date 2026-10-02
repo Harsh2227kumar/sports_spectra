@@ -36,14 +36,9 @@ function Auction() {
     const [activeTeam, setActiveTeam] = useState(null);
     const [players, setPlayers] = useState([]);
     const [isPageLoading, setIsPageLoading] = useState(true);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [isTeamLoading, setIsTeamLoading] = useState(false);
     const [hoveredTeam, setHoveredTeam] = useState(null);
-
-    useEffect(() => {
-        // Initial page load skeleton
-        const timer = setTimeout(() => setIsPageLoading(false), 700);
-        return () => clearTimeout(timer);
-    }, []);
 
     const handleTeamClick = (team) => {
         if (activeTeam === team) return;
@@ -53,7 +48,10 @@ function Auction() {
     };
 
     useEffect(() => {
-        const fetchSupabasePlayers = async () => {
+        const fetchSupabasePlayers = async (isBackground = false) => {
+            if (!isBackground) setIsPageLoading(true);
+            else setIsSyncing(true);
+
             const { data, error } = await supabase
                 .from('players')
                 .select('*');
@@ -77,15 +75,18 @@ function Auction() {
                 setPlayers(mappedData);
                 localStorage.setItem('auctionPlayers', JSON.stringify(mappedData));
             }
+
+            setIsPageLoading(false);
+            setIsSyncing(false);
         };
 
-        fetchSupabasePlayers();
+        fetchSupabasePlayers(false);
 
         // Subscribe to real-time changes
         const subscription = supabase
             .channel('players_channel')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, payload => {
-                fetchSupabasePlayers();
+                fetchSupabasePlayers(true); // background fetch
             })
             .subscribe();
 
@@ -187,7 +188,16 @@ function Auction() {
                         <div className="mb-12">
                             <div className="flex items-center gap-2 mb-2">
                                 <div className="w-8 h-1 bg-orange-500 rounded-full"></div>
-                                <span className="text-xs font-bold text-gray-800 tracking-widest uppercase">Live Auction</span>
+                                <span className="text-xs font-bold text-gray-800 tracking-widest uppercase flex items-center gap-2">
+                                    Live Auction
+                                    {isPageLoading ? (
+                                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1 animate-pulse"><i className="fa-solid fa-circle-notch fa-spin"></i> CONNECTING TO DB</span>
+                                    ) : isSyncing ? (
+                                        <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1 animate-pulse"><i className="fa-solid fa-arrows-rotate fa-spin"></i> SYNCING</span>
+                                    ) : (
+                                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1"><i className="fa-solid fa-circle text-[6px] animate-pulse"></i> SUPABASE LIVE</span>
+                                    )}
+                                </span>
                             </div>
                             <h1 className="hero-font text-5xl md:text-6xl text-gray-900 tracking-tighter leading-none mb-1">
                                 AUCTION <span className="text-orange-500">DASHBOARD</span>
