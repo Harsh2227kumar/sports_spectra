@@ -16,6 +16,7 @@ function getNormalizedTeam(teamName) {
 
 function Auction() {
     const [activeTeam, setActiveTeam] = useState(null);
+    const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [players, setPlayers] = useState([]);
     const [teamsList, setTeamsList] = useState(() => getLocalTeams());
     const [isPageLoading, setIsPageLoading] = useState(true);
@@ -32,6 +33,7 @@ function Auction() {
     const [showSqlGuide, setShowSqlGuide] = useState(false);
 
     const handleTeamClick = (teamName) => {
+        setMobileDrawerOpen(false);
         if (activeTeam === teamName) return;
         setIsTeamLoading(true);
         setActiveTeam(teamName);
@@ -276,24 +278,24 @@ function Auction() {
         const cardBgImg = leader.gender === 'M' ? '/boy_bg.png' : '/girl_bg.png';
         
         return (
-            <div className="bg-white rounded-[40px] p-10 shadow-xl shadow-gray-200/50 border border-white overflow-hidden relative group hover:shadow-2xl hover:shadow-orange-100 transition-all duration-300"
+            <div className="bg-white rounded-3xl sm:rounded-[40px] p-5 sm:p-8 md:p-10 shadow-xl shadow-gray-200/50 border border-white overflow-hidden relative group hover:shadow-2xl hover:shadow-orange-100 transition-all duration-300"
                  style={{ background: `url('${cardBgImg}') no-repeat center center`, backgroundSize: 'cover' }}>
-                <div className={`absolute top-0 right-0 ${roleColor} text-white px-6 py-2 rounded-bl-3xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 z-10 shadow-sm`}>
+                <div className={`absolute top-0 right-0 ${roleColor} text-white px-4 sm:px-6 py-1.5 sm:py-2 rounded-bl-2xl sm:rounded-bl-3xl text-[9px] sm:text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 sm:gap-2 z-10 shadow-xs`}>
                     <i className={`fa-solid ${roleIcon}`}></i> {roleTitle}
                 </div>
                 <div className="flex flex-col items-center relative z-10">
-                    <div className={`w-40 h-40 rounded-[32px] flex items-center justify-center text-5xl font-black ${initialColor} shadow-inner mb-8 group-hover:scale-105 transition-transform duration-300 border border-black/5 overflow-hidden`} style={{ backgroundColor: bgColor || '#FF4500' }}>
+                    <div className={`w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-2xl sm:rounded-[32px] flex items-center justify-center text-3xl sm:text-4xl md:text-5xl font-black ${initialColor} shadow-inner mb-4 sm:mb-8 group-hover:scale-105 transition-transform duration-300 border border-black/5 overflow-hidden`} style={{ backgroundColor: bgColor || '#FF4500' }}>
                         {leader.photo ? (
                             <img src={leader.photo} className="w-full h-full object-cover" alt={leader.name} />
                         ) : (
                             leader.initials || (leader.name ? leader.name.slice(0, 2).toUpperCase() : 'LD')
                         )}
                     </div>
-                    <h3 className="text-3xl font-black tracking-tighter text-center text-gray-900 leading-tight">{leader.name}</h3>
-                    <p className="text-gray-400 font-bold uppercase text-[10px] mt-2 tracking-widest">{leader.gender} &nbsp;|&nbsp; {roleTitle}</p>
-                    <div className="mt-8 bg-orange-50 border border-orange-100 px-8 py-2.5 rounded-full flex items-center gap-2 shadow-sm">
+                    <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-center text-gray-900 leading-tight">{leader.name}</h3>
+                    <p className="text-gray-400 font-bold uppercase text-[9px] sm:text-[10px] mt-1.5 sm:mt-2 tracking-widest">{leader.gender} &nbsp;|&nbsp; {roleTitle}</p>
+                    <div className="mt-5 sm:mt-8 bg-orange-50 border border-orange-100 px-6 sm:px-8 py-2 sm:py-2.5 rounded-full flex items-center gap-2 shadow-xs">
                         <i className="fa-solid fa-circle-check text-orange-500"></i>
-                        <span className="text-orange-500 font-black text-xs uppercase tracking-widest">RETAINED</span>
+                        <span className="text-orange-500 font-black text-[10px] sm:text-xs uppercase tracking-widest">RETAINED</span>
                     </div>
                 </div>
             </div>
@@ -301,9 +303,190 @@ function Auction() {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden">
-            {/* SIDEBAR */}
-            <aside className="flex flex-col shrink-0" style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover', width: '260px', transition: 'all 0.3s' }}>
+        <div className="flex flex-col lg:flex-row h-screen overflow-hidden bg-[#F3F4F6]">
+            {/* MOBILE TOP BAR (Screens < lg) */}
+            <header className="lg:hidden bg-[#111827] text-white px-3 sm:px-4 py-3 border-b border-white/10 flex items-center justify-between sticky top-0 z-30 shadow-md shrink-0">
+                <div className="flex items-center gap-2.5 sm:gap-3">
+                    <button 
+                        onClick={() => setMobileDrawerOpen(true)}
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 hover:bg-white/20 active:bg-white/30 text-white flex items-center justify-center text-sm transition cursor-pointer"
+                        aria-label="Open Navigation Menu"
+                    >
+                        <i className="fa-solid fa-bars"></i>
+                    </button>
+                    <div className="cursor-pointer" onClick={() => setActiveTeam(null)}>
+                        <span className="hero-font text-sm sm:text-base leading-none tracking-tight block">
+                            SPORTS <span className="text-orange-500">SPECTRA 4.0</span>
+                        </span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block truncate max-w-[130px] sm:max-w-[200px]">
+                            {activeTeam || 'Auction Dashboard'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setShowConfigModal(true)}
+                        className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition cursor-pointer ${
+                            dbStatus.connected ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }`}
+                        title="Configure Supabase Database"
+                    >
+                        <span className={`w-2 h-2 rounded-full ${dbStatus.connected ? 'bg-green-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                        <span className="hidden xs:inline">{dbStatus.connected ? `${dbStatus.latency}ms` : 'DB Offline'}</span>
+                    </button>
+                    <button 
+                        onClick={() => fetchAllAuctionData(true)} 
+                        className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-orange-500 hover:bg-orange-600 text-white flex items-center justify-center text-xs transition cursor-pointer shadow-xs"
+                        title="Refresh Auction Data"
+                    >
+                        <i className={`fa-solid fa-rotate ${isSyncing ? 'fa-spin' : ''}`}></i>
+                    </button>
+                </div>
+            </header>
+
+            {/* MOBILE QUICK FRANCHISE SWITCHER BAR (Screens < lg) */}
+            <div className="lg:hidden bg-white border-b border-gray-200 px-3 sm:px-4 py-2 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 shadow-xs z-20">
+                <button
+                    onClick={() => setActiveTeam(null)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                        !activeTeam ? 'bg-orange-500 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                >
+                    <i className="fa-solid fa-grip text-[10px]"></i> All Teams
+                </button>
+                {teamsList.map(teamObj => {
+                    const isSelected = activeTeam === teamObj.name;
+                    return (
+                        <button
+                            key={teamObj.name}
+                            onClick={() => handleTeamClick(teamObj.name)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                                isSelected ? 'bg-orange-500 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+                            {teamObj.name}
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* MOBILE OFF-CANVAS SLIDING DRAWER (Screens < lg) */}
+            <div className={`fixed inset-0 z-50 lg:hidden transition-all duration-300 ${
+                mobileDrawerOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+            }`}>
+                {/* Backdrop */}
+                <div 
+                    className="absolute inset-0 bg-black/70 backdrop-blur-xs transition-opacity cursor-pointer" 
+                    onClick={() => setMobileDrawerOpen(false)} 
+                />
+                
+                {/* Sliding Navigation Panel */}
+                <aside 
+                    className={`absolute top-0 bottom-0 left-0 w-72 max-w-[85vw] flex flex-col shadow-2xl transition-transform duration-300 transform bg-[#111827] text-white ${
+                        mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+                    }`}
+                    style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover' }}
+                >
+                    <div className="p-5 flex items-center justify-between border-b border-white/10">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-orange-600 p-2 rounded-xl text-white">
+                                <i className="fa-solid fa-bolt-lightning"></i>
+                            </div>
+                            <div className="hero-font text-white text-base leading-none cursor-pointer" onClick={() => { setActiveTeam(null); setMobileDrawerOpen(false); }}>
+                                SPORTS<br /><span className="text-orange-500">SPECTRA 4.0</span>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setMobileDrawerOpen(false)}
+                            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center text-sm transition cursor-pointer"
+                        >
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <nav className="flex-1 overflow-y-auto no-scrollbar py-3">
+                        {activeTeam ? (
+                            <button 
+                                onClick={() => { setActiveTeam(null); setMobileDrawerOpen(false); }} 
+                                className="w-[calc(100%-24px)] text-left text-orange-400 bg-white/5 hover:bg-white/10 transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-sm cursor-pointer"
+                            >
+                                <i className="fa-solid fa-house-chimney w-5 text-center"></i> All Franchises
+                            </button>
+                        ) : (
+                            <Link 
+                                to="/" 
+                                onClick={() => setMobileDrawerOpen(false)}
+                                className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-sm cursor-pointer"
+                            >
+                                <i className="fa-solid fa-arrow-left w-5 text-center"></i> Back to main website
+                            </Link>
+                        )}
+
+                        <div className="px-6 mt-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                            Franchises ({teamsList.length})
+                        </div>
+
+                        {teamsList.map(teamObj => (
+                            <button 
+                                key={teamObj.name} 
+                                onClick={() => handleTeamClick(teamObj.name)}
+                                className={`w-[calc(100%-24px)] text-left relative block text-[#9CA3AF] hover:text-white transition-colors rounded-xl mx-3 my-1 px-4 py-2.5 cursor-pointer group ${
+                                    activeTeam === teamObj.name ? 'bg-[#FF6B00] !text-white font-bold shadow-md' : 'hover:bg-white/5'
+                                }`}
+                            >
+                                <span className="relative z-10 flex items-center gap-3 font-semibold text-sm">
+                                    <i className="fa-solid fa-users w-5 text-center"></i> {teamObj.name}
+                                    {activeTeam === teamObj.name && <i className="fa-solid fa-chevron-right ml-auto text-[10px]"></i>}
+                                </span>
+                            </button>
+                        ))}
+
+                        <div className="px-6 mt-5 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                            Management
+                        </div>
+                        <Link 
+                            to="/doremon" 
+                            onClick={() => setMobileDrawerOpen(false)}
+                            className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-xs cursor-pointer"
+                        >
+                            <i className="fa-solid fa-gavel w-5 text-center text-orange-500"></i> Auction Bidding
+                        </Link>
+                        <Link 
+                            to="/doremon/import-export" 
+                            onClick={() => setMobileDrawerOpen(false)}
+                            className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-xs cursor-pointer"
+                        >
+                            <i className="fa-solid fa-file-import w-5 text-center text-orange-500"></i> Import & Export
+                        </Link>
+                    </nav>
+
+                    {/* Connection Status in Mobile Drawer */}
+                    <div className="p-3.5 m-3 bg-black/50 rounded-2xl border border-white/10 text-xs">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Database</span>
+                            {dbStatus.connected ? (
+                                <span className="flex items-center gap-1.5 text-green-400 font-bold text-[10px]">
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                    {dbStatus.latency}ms
+                                </span>
+                            ) : (
+                                <span className="text-amber-400 font-bold text-[10px]">Disconnected</span>
+                            )}
+                        </div>
+                        <button 
+                            onClick={() => { setMobileDrawerOpen(false); setShowConfigModal(true); }} 
+                            className="text-[10px] text-orange-400 hover:text-orange-300 font-bold underline cursor-pointer"
+                        >
+                            {dbStatus.connected ? 'Connection Settings' : 'Configure Supabase'}
+                        </button>
+                    </div>
+                </aside>
+            </div>
+
+            {/* DESKTOP SIDEBAR (Screens >= lg) */}
+            <aside className="hidden lg:flex flex-col shrink-0 w-64 xl:w-72" style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover', transition: 'all 0.3s' }}>
                 <div className="p-8">
                     <div className="flex items-center gap-3">
                         <div className="bg-orange-600 p-2 rounded-xl text-white">
@@ -373,15 +556,15 @@ function Auction() {
             </aside>
 
             {/* MAIN CONTENT AREA */}
-            <main className="flex-1 flex flex-col overflow-y-auto relative" style={{ background: "url('/bg.png') no-repeat center center fixed", backgroundSize: 'cover' }}>
+            <main className="flex-1 flex flex-col overflow-y-auto relative w-full" style={{ background: "url('/bg.png') no-repeat center center fixed", backgroundSize: 'cover' }}>
                 
                 {!activeTeam ? (
-                    <div className="p-10 flex-1 relative z-10">
-                        <div className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                    <div className="p-3.5 sm:p-6 md:p-10 flex-1 relative z-10 w-full max-w-7xl mx-auto">
+                        <div className="mb-6 sm:mb-8 md:mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
                             <div>
-                                <div className="flex items-center gap-2 mb-2">
-                                    <div className="w-8 h-1 bg-orange-500 rounded-full"></div>
-                                    <span className="text-xs font-bold text-gray-800 tracking-widest uppercase flex items-center gap-2">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                    <div className="w-6 sm:w-8 h-1 bg-orange-500 rounded-full"></div>
+                                    <span className="text-[10px] sm:text-xs font-bold text-gray-800 tracking-widest uppercase flex items-center gap-2 flex-wrap">
                                         Live Auction
                                         {isPageLoading ? (
                                             <span className="bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 animate-pulse">
@@ -393,7 +576,7 @@ function Auction() {
                                             </span>
                                         ) : dbStatus.connected ? (
                                             <span className="bg-green-100 text-green-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                                <i className="fa-solid fa-circle text-[6px] animate-pulse"></i> SUPABASE LIVE ({dbStatus.latency}ms)
+                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span> SUPABASE LIVE ({dbStatus.latency}ms)
                                             </span>
                                         ) : (
                                             <span className="bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 cursor-pointer" onClick={() => setShowConfigModal(true)}>
@@ -402,22 +585,22 @@ function Auction() {
                                         )}
                                     </span>
                                 </div>
-                                <h1 className="hero-font text-5xl md:text-6xl text-gray-900 tracking-tighter leading-none mb-1">
+                                <h1 className="hero-font text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-gray-900 tracking-tight leading-none mb-1">
                                     AUCTION <span className="text-orange-500">DASHBOARD</span>
                                 </h1>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">
                                     Real-time Franchise Standings & Budget
                                 </p>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                                 <button onClick={() => fetchAllAuctionData(true)} 
-                                        className="bg-white/90 hover:bg-white text-gray-700 font-bold px-4 py-2.5 rounded-xl border border-gray-200 text-xs flex items-center gap-2 shadow-xs transition hover:shadow cursor-pointer">
+                                        className="bg-white/90 hover:bg-white text-gray-700 font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-xs flex items-center gap-2 shadow-xs transition hover:shadow cursor-pointer">
                                     <i className={`fa-solid fa-rotate text-orange-500 ${isSyncing ? 'fa-spin' : ''}`}></i>
                                     Refresh Now
                                 </button>
                                 <button onClick={() => setShowConfigModal(true)} 
-                                        className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition cursor-pointer">
+                                        className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition cursor-pointer">
                                     <i className="fa-solid fa-database"></i>
                                     Database Connection
                                 </button>
@@ -426,17 +609,17 @@ function Auction() {
 
                         {/* PROMINENT DATABASE NOT CONNECTED BANNER */}
                         {!dbStatus.connected && (
-                            <div className="max-w-7xl mx-auto mb-10 p-6 md:p-8 bg-gradient-to-r from-orange-500/10 via-amber-500/15 to-orange-500/10 border-2 border-orange-500/30 rounded-3xl backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-14 h-14 rounded-2xl bg-orange-500 text-white flex items-center justify-center text-2xl shrink-0 shadow-sm shadow-orange-500/30">
+                            <div className="mb-6 sm:mb-10 p-4 sm:p-6 md:p-8 bg-gradient-to-r from-orange-500/10 via-amber-500/15 to-orange-500/10 border-2 border-orange-500/30 rounded-2xl sm:rounded-3xl backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6 shadow-sm">
+                                <div className="flex items-start gap-3 sm:gap-4">
+                                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-orange-500 text-white flex items-center justify-center text-xl sm:text-2xl shrink-0 shadow-sm shadow-orange-500/30">
                                         <i className="fa-solid fa-database animate-pulse"></i>
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                                            <h3 className="font-black text-gray-900 text-lg">
+                                            <h3 className="font-black text-gray-900 text-base sm:text-lg">
                                                 Auction Dashboard Is Not Connected To Supabase
                                             </h3>
-                                            <span className="text-[10px] bg-red-100 text-red-700 font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                            <span className="text-[9px] sm:text-[10px] bg-red-100 text-red-700 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
                                                 Database Disconnected
                                             </span>
                                         </div>
@@ -445,16 +628,16 @@ function Auction() {
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full md:w-auto shrink-0">
                                     <button 
                                         onClick={() => setShowConfigModal(true)} 
-                                        className="flex-1 md:flex-none px-6 py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black rounded-xl transition shadow-lg shadow-orange-500/30 cursor-pointer flex items-center justify-center gap-2"
+                                        className="px-5 py-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black rounded-xl transition shadow-md shadow-orange-500/30 cursor-pointer flex items-center justify-center gap-2"
                                     >
                                         <i className="fa-solid fa-plug"></i> Connect Database Now
                                     </button>
                                     <button 
                                         onClick={() => setShowSqlGuide(true)} 
-                                        className="flex-1 md:flex-none px-5 py-3.5 bg-white hover:bg-gray-50 text-gray-800 text-xs font-bold rounded-xl border border-gray-200 transition cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                                        className="px-4 py-3 bg-white hover:bg-gray-50 text-gray-800 text-xs font-bold rounded-xl border border-gray-200 transition cursor-pointer flex items-center justify-center gap-2 shadow-xs"
                                     >
                                         <i className="fa-solid fa-code text-orange-500"></i> View SQL Script
                                     </button>
@@ -463,28 +646,28 @@ function Auction() {
                         )}
 
                         {isPageLoading ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                                 {[1,2,3,4,5,6,7,8].map(i => (
-                                    <div key={i} className="bg-white rounded-[24px] p-6 border border-gray-100 relative h-[260px]">
+                                    <div key={i} className="bg-white rounded-2xl sm:rounded-[24px] p-5 sm:p-6 border border-gray-100 relative h-[240px] sm:h-[260px]">
                                         <div className="animate-pulse flex flex-col h-full justify-between">
                                             <div className="flex items-center gap-4 mt-2">
-                                                <div className="w-24 h-24 bg-gray-200 rounded-xl"></div>
+                                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-200 rounded-xl"></div>
                                                 <div className="flex flex-col gap-2">
-                                                    <div className="w-20 h-6 bg-gray-200 rounded"></div>
+                                                    <div className="w-20 h-5 bg-gray-200 rounded"></div>
                                                     <div className="w-16 h-3 bg-gray-200 rounded"></div>
                                                 </div>
                                             </div>
                                             <div className="flex justify-between items-end mt-4">
-                                                <div className="flex flex-col gap-2">
+                                                <div className="flex flex-col gap-1.5">
                                                     <div className="w-12 h-3 bg-gray-200 rounded"></div>
                                                     <div className="w-16 h-5 bg-gray-200 rounded"></div>
                                                 </div>
-                                                <div className="flex flex-col gap-2 items-end">
+                                                <div className="flex flex-col gap-1.5 items-end">
                                                     <div className="w-12 h-3 bg-gray-200 rounded"></div>
                                                     <div className="w-16 h-5 bg-gray-200 rounded"></div>
                                                 </div>
                                             </div>
-                                            <div className="mt-5 pt-4 border-t border-gray-50">
+                                            <div className="mt-4 pt-3 border-t border-gray-50">
                                                 <div className="w-full h-2.5 bg-gray-200 rounded-full"></div>
                                                 <div className="w-12 h-2 bg-gray-200 rounded mt-2"></div>
                                             </div>
@@ -493,7 +676,7 @@ function Auction() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                                 {teamsList.map(teamObj => {
                                     const team = teamObj.name;
                                     const totalPurse = Number(teamObj.total_purse || 10000);
@@ -512,23 +695,23 @@ function Auction() {
                                     
                                     return (
                                         <div key={team} onClick={() => handleTeamClick(team)}
-                                             className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group">
+                                             className="bg-white rounded-2xl sm:rounded-[24px] p-5 sm:p-6 shadow-xs border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group">
                                             
                                             {/* Faint watermark on the right */}
-                                            <div className="absolute -bottom-4 -right-4 w-40 h-40 opacity-[0.04] group-hover:scale-110 group-hover:opacity-[0.08] transition-all pointer-events-none grayscale">
+                                            <div className="absolute -bottom-4 -right-4 w-32 h-32 sm:w-40 sm:h-40 opacity-[0.04] group-hover:scale-110 group-hover:opacity-[0.08] transition-all pointer-events-none grayscale">
                                                 <img src={logoUrl} className="w-full h-full object-contain" alt="" />
                                             </div>
 
                                             {/* Chevron icon top right */}
-                                            <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-gray-100 transition-colors shadow-sm">
+                                            <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-gray-100 transition-colors shadow-xs">
                                                 <i className="fa-solid fa-chevron-right text-[10px]"></i>
                                             </div>
 
-                                            <div className="flex items-center gap-4 relative z-10 mb-6 mt-4">
-                                                <img src={logoUrl} className="w-24 h-24 object-contain drop-shadow-md group-hover:scale-110 transition-transform -ml-2" alt={`${team} logo`} />
-                                                <div>
-                                                    <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight leading-none">{team}</h3>
-                                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1.5">
+                                            <div className="flex items-center gap-3 sm:gap-4 relative z-10 mb-4 sm:mb-6 mt-1 sm:mt-2">
+                                                <img src={logoUrl} className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-sm group-hover:scale-105 transition-transform" alt={`${team} logo`} />
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="text-lg sm:text-xl font-black text-gray-900 uppercase tracking-tight leading-tight truncate">{team}</h3>
+                                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
                                                         {totalSquadCount} MEMBERS SQUAD
                                                     </p>
                                                 </div>
@@ -536,17 +719,17 @@ function Auction() {
 
                                             <div className="flex justify-between items-end relative z-10">
                                                 <div>
-                                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Purse Left</p>
-                                                    <p className="text-xl font-black text-green-500 leading-none">₹{purseLeft.toLocaleString('en-IN')}</p>
+                                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Purse Left</p>
+                                                    <p className="text-lg sm:text-xl font-black text-green-500 leading-none">₹{purseLeft.toLocaleString('en-IN')}</p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Spent</p>
-                                                    <p className="text-xl font-black text-gray-900 leading-none">₹{totalSpent.toLocaleString('en-IN')}</p>
+                                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Spent</p>
+                                                    <p className="text-lg sm:text-xl font-black text-gray-900 leading-none">₹{totalSpent.toLocaleString('en-IN')}</p>
                                                 </div>
                                             </div>
                                             
-                                            <div className="mt-5 relative z-10 pt-4 border-t border-gray-50">
-                                                <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                                            <div className="mt-4 sm:mt-5 relative z-10 pt-3 sm:pt-4 border-t border-gray-50">
+                                                <div className="w-full h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
                                                     <div className={`h-full ${themeColor} rounded-full transition-all duration-500`} style={{ width: `${percentUsed}%` }}></div>
                                                 </div>
                                                 <div className="flex justify-between items-center mt-2">
@@ -561,23 +744,23 @@ function Auction() {
                         )}
                     </div>
                 ) : (
-                    <div className="p-10 flex-1 relative z-10">
+                    <div className="p-3.5 sm:p-6 md:p-10 flex-1 relative z-10 w-full max-w-7xl mx-auto">
                         {/* LIVE AUCTION Title & Breadcrumbs */}
-                        <div className="flex justify-between items-center mb-8">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
                             <div>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Live Auction</p>
-                                <h2 className="hero-font text-4xl text-gray-900 tracking-tight">AUCTION <span className="text-orange-500">DASHBOARD</span></h2>
-                                <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1 font-bold uppercase tracking-wider">
+                                <p className="text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase tracking-widest">Live Auction</p>
+                                <h2 className="hero-font text-2xl sm:text-3xl md:text-4xl text-gray-900 tracking-tight">AUCTION <span className="text-orange-500">DASHBOARD</span></h2>
+                                <div className="flex items-center gap-2 text-[10px] sm:text-[11px] text-gray-400 mt-1 font-bold uppercase tracking-wider flex-wrap">
                                     <Link to="/" className="hover:text-orange-500 transition"><i className="fa-solid fa-house"></i></Link> / 
-                                    <a onClick={() => setActiveTeam(null)} className="hover:text-orange-500 transition cursor-pointer">Teams</a> / 
+                                    <button onClick={() => setActiveTeam(null)} className="hover:text-orange-500 transition cursor-pointer">Teams</button> / 
                                     <span className="text-gray-900">{activeTeam}</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <button onClick={() => setActiveTeam(null)} className="bg-white/90 hover:bg-white text-gray-700 font-bold px-4 py-2.5 rounded-xl border border-gray-200 text-xs flex items-center gap-2 shadow-xs transition cursor-pointer">
+                            <div className="flex items-center gap-2.5 sm:gap-4 w-full sm:w-auto">
+                                <button onClick={() => setActiveTeam(null)} className="flex-1 sm:flex-none bg-white/90 hover:bg-white text-gray-700 font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-xs flex items-center justify-center gap-2 shadow-xs transition cursor-pointer">
                                     <i className="fa-solid fa-arrow-left"></i> All Franchises
                                 </button>
-                                <button onClick={() => fetchAllAuctionData(true)} className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-sm transition cursor-pointer">
+                                <button onClick={() => fetchAllAuctionData(true)} className="flex-1 sm:flex-none bg-orange-500 hover:bg-orange-600 text-white font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition cursor-pointer">
                                     <i className={`fa-solid fa-arrows-rotate ${isSyncing ? 'fa-spin' : ''}`}></i>
                                     Sync
                                 </button>
@@ -585,20 +768,20 @@ function Auction() {
                         </div>
 
                         {isTeamLoading ? (
-                            <div className="max-w-7xl mx-auto w-full animate-pulse">
-                                <div className="h-32 bg-gray-200/60 rounded-[24px] mb-10 border border-gray-100"></div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                            <div className="w-full animate-pulse">
+                                <div className="h-28 sm:h-32 bg-gray-200/60 rounded-2xl sm:rounded-[24px] mb-6 sm:mb-10 border border-gray-100"></div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-12">
                                     {[1, 2].map(i => (
-                                        <div key={i} className="bg-white rounded-[40px] p-10 h-[400px] shadow-sm border border-gray-100">
-                                            <div className="w-40 h-40 bg-gray-200/80 rounded-[32px] mx-auto mb-8"></div>
-                                            <div className="w-48 h-8 bg-gray-200/80 rounded-full mx-auto mb-4"></div>
-                                            <div className="w-32 h-4 bg-gray-200/80 rounded-full mx-auto"></div>
+                                        <div key={i} className="bg-white rounded-3xl sm:rounded-[40px] p-6 sm:p-10 h-[320px] sm:h-[400px] shadow-sm border border-gray-100">
+                                            <div className="w-28 h-28 sm:w-40 sm:h-40 bg-gray-200/80 rounded-2xl sm:rounded-[32px] mx-auto mb-6 sm:mb-8"></div>
+                                            <div className="w-40 h-6 sm:w-48 sm:h-8 bg-gray-200/80 rounded-full mx-auto mb-4"></div>
+                                            <div className="w-28 h-4 bg-gray-200/80 rounded-full mx-auto"></div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         ) : (
-                            <div className="max-w-7xl mx-auto w-full">
+                            <div className="w-full">
                                 {(() => {
                                     const teamDraftedPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(activeTeam));
                                     const currentTeamData = teamsList.find(t => getNormalizedTeam(t.name) === getNormalizedTeam(activeTeam)) || {
@@ -639,92 +822,92 @@ function Auction() {
                                     return (
                                         <>
                                             {/* TEAM INFO & STATS */}
-                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 bg-orange-50/40 p-6 rounded-[24px] border border-orange-100/50 backdrop-blur-sm shadow-sm">
+                                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6 mb-6 sm:mb-10 bg-orange-50/50 p-4 sm:p-6 rounded-2xl sm:rounded-[24px] border border-orange-100/60 backdrop-blur-sm shadow-xs">
                                                 <div>
-                                                    <h2 className="text-5xl font-black tracking-tighter text-gray-900">{activeTeam.toUpperCase()}</h2>
-                                                    <p className="text-orange-500 font-black text-xs uppercase tracking-[0.2em] mt-2">
+                                                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-gray-900">{activeTeam.toUpperCase()}</h2>
+                                                    <p className="text-orange-500 font-black text-[10px] sm:text-xs uppercase tracking-widest mt-1.5 sm:mt-2">
                                                         {regulars.length + retainedCount} PLAYERS SQUAD ({regulars.length} DRAFTED)
                                                     </p>
                                                 </div>
-                                                <div className="flex flex-wrap gap-4">
-                                                    <div className="rounded-[20px] px-6 py-4 flex items-center gap-4 border border-black/5 bg-[#FFF0F5] shadow-sm">
-                                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-pink-500 shadow-sm"><i className="fa-solid fa-user-group text-xl"></i></div>
+                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
+                                                    <div className="rounded-xl sm:rounded-[20px] px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 sm:gap-4 border border-black/5 bg-[#FFF0F5] shadow-xs">
+                                                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center text-pink-500 shadow-xs shrink-0"><i className="fa-solid fa-user-group text-lg sm:text-xl"></i></div>
                                                         <div>
-                                                            <p className="text-[10px] font-extrabold text-pink-400 uppercase tracking-widest">Girls Needed</p>
-                                                            <p className="text-3xl font-black text-pink-600 leading-none mt-1">{girlsRemaining}</p>
+                                                            <p className="text-[9px] sm:text-[10px] font-extrabold text-pink-400 uppercase tracking-widest">Girls Needed</p>
+                                                            <p className="text-2xl sm:text-3xl font-black text-pink-600 leading-none mt-1">{girlsRemaining}</p>
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-[20px] px-6 py-4 flex items-center gap-4 border border-black/5 bg-white shadow-sm">
-                                                        <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-600 shadow-inner border border-gray-100"><i className="fa-solid fa-coins text-xl"></i></div>
+                                                    <div className="rounded-xl sm:rounded-[20px] px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 sm:gap-4 border border-black/5 bg-white shadow-xs">
+                                                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-gray-600 shadow-inner border border-gray-100 shrink-0"><i className="fa-solid fa-coins text-lg sm:text-xl"></i></div>
                                                         <div>
-                                                            <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Total Spent</p>
-                                                            <p className="text-3xl font-black text-gray-900 leading-none mt-1">₹{totalSpent.toLocaleString('en-IN')}</p>
+                                                            <p className="text-[9px] sm:text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Total Spent</p>
+                                                            <p className="text-2xl sm:text-3xl font-black text-gray-900 leading-none mt-1">₹{totalSpent.toLocaleString('en-IN')}</p>
                                                         </div>
                                                     </div>
-                                                    <div className="rounded-[20px] px-6 py-4 flex items-center gap-4 border border-black/5 bg-[#EBFCF5] shadow-sm">
-                                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><i className="fa-solid fa-money-bill-wave text-xl"></i></div>
+                                                    <div className="rounded-xl sm:rounded-[20px] px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 sm:gap-4 border border-black/5 bg-[#EBFCF5] shadow-xs">
+                                                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center text-green-500 shadow-xs shrink-0"><i className="fa-solid fa-money-bill-wave text-lg sm:text-xl"></i></div>
                                                         <div>
-                                                            <p className="text-[10px] font-extrabold text-green-500 uppercase tracking-widest">Purse Left</p>
-                                                            <p className="text-3xl font-black text-green-600 leading-none mt-1">₹{purseLeft.toLocaleString('en-IN')}</p>
+                                                            <p className="text-[9px] sm:text-[10px] font-extrabold text-green-500 uppercase tracking-widest">Purse Left</p>
+                                                            <p className="text-2xl sm:text-3xl font-black text-green-600 leading-none mt-1">₹{purseLeft.toLocaleString('en-IN')}</p>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* RETAINED LEADERS (Only show if captain/vice-captain are configured) */}
+                                            {/* RETAINED LEADERS */}
                                             {(currentTeamData.captain_name || currentTeamData.vice_captain_name) && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-12">
                                                     {currentTeamData.captain_name ? renderLeaderCard(captainData, 'CAPTAIN', 'fa-crown', captainData.color) : null}
                                                     {currentTeamData.vice_captain_name ? renderLeaderCard(viceCaptainData, 'VICE CAPTAIN', 'fa-star', viceCaptainData.color) : null}
                                                 </div>
                                             )}
 
                                             {/* DRAFTED PLAYERS SQUAD */}
-                                            <div className="bg-white rounded-[32px] p-8 shadow-sm border border-gray-100 mb-12">
-                                                <div className="flex justify-between items-center mb-6">
+                                            <div className="bg-white rounded-2xl sm:rounded-[32px] p-4 sm:p-6 md:p-8 shadow-xs border border-gray-100 mb-8 sm:mb-12">
+                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6">
                                                     <div>
-                                                        <h3 className="text-2xl font-black text-gray-900">Drafted Squad</h3>
-                                                        <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mt-1">
+                                                        <h3 className="text-xl sm:text-2xl font-black text-gray-900">Drafted Squad</h3>
+                                                        <p className="text-[11px] sm:text-xs text-gray-400 uppercase tracking-wider font-bold mt-0.5">
                                                             {regulars.length} Regular Players Drafted
                                                         </p>
                                                     </div>
-                                                    <div className="text-xs font-bold text-gray-500">
+                                                    <div className="text-xs font-bold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
                                                         {activeTeam}
                                                     </div>
                                                 </div>
 
                                                 {regulars.length === 0 ? (
-                                                    <div className="text-center py-16 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                                                        <i className="fa-solid fa-users text-4xl text-gray-300 mb-3"></i>
+                                                    <div className="text-center py-12 sm:py-16 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                                                        <i className="fa-solid fa-users text-3xl sm:text-4xl text-gray-300 mb-3"></i>
                                                         <p className="text-gray-500 font-bold text-sm">No regular players drafted yet for {activeTeam}.</p>
                                                         <p className="text-gray-400 text-xs mt-1">Go to the Auction Bidding desk in Admin Panel to draft players from the database.</p>
                                                     </div>
                                                 ) : (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                                                         {regulars.map(player => (
-                                                            <div key={player.id} className="bg-gray-50/60 hover:bg-orange-50/50 rounded-2xl p-4 flex items-center justify-between border border-gray-100 transition group">
-                                                                <div className="flex items-center gap-4">
-                                                                    <div className="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-base shrink-0 overflow-hidden shadow-xs">
+                                                            <div key={player.id} className="bg-gray-50/60 hover:bg-orange-50/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-100 transition group">
+                                                                <div className="flex items-center gap-3 sm:gap-4">
+                                                                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm sm:text-base shrink-0 overflow-hidden shadow-xs">
                                                                         {player.photoUrl ? (
                                                                             <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
                                                                         ) : (
                                                                             player.name.charAt(0)
                                                                         )}
                                                                     </div>
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="font-bold text-gray-900 text-base">{player.name}</span>
+                                                                    <div className="min-w-0">
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <span className="font-bold text-gray-900 text-sm sm:text-base">{player.name}</span>
                                                                             <span className="text-[10px] font-bold bg-white text-gray-600 border border-gray-200 px-2 py-0.5 rounded-md">
                                                                                 {player.gender}
                                                                             </span>
                                                                         </div>
-                                                                        <p className="text-xs text-gray-500 mt-1">
-                                                                            Year: <strong>{player.year || 'N/A'}</strong> | Sec: <strong>{player.section || 'N/A'}</strong> | <strong>{player.sports || 'Sports'}</strong>
+                                                                        <p className="text-[11px] sm:text-xs text-gray-500 mt-1 truncate">
+                                                                            Yr: <strong>{player.year || 'N/A'}</strong> | Sec: <strong>{player.section || 'N/A'}</strong> | <strong>{player.sports || 'Sports'}</strong>
                                                                         </p>
                                                                     </div>
                                                                 </div>
-                                                                <div className="text-right">
-                                                                    <span className="text-lg font-black text-orange-600">
+                                                                <div className="sm:text-right flex sm:flex-col justify-between items-baseline sm:items-end border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100">
+                                                                    <span className="text-base sm:text-lg font-black text-orange-600">
                                                                         ₹{Number(player.bidAmount || 0).toLocaleString('en-IN')}
                                                                     </span>
                                                                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Winning Bid</p>
@@ -745,19 +928,19 @@ function Auction() {
 
             {/* Supabase Configuration Modal */}
             {showConfigModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-gray-100">
-                        <div className="flex justify-between items-center mb-6">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+                    <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-100">
+                        <div className="flex justify-between items-center mb-5 sm:mb-6">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
                                     <i className="fa-solid fa-database"></i>
                                 </div>
                                 <div>
-                                    <h3 className="font-black text-xl text-gray-900">Supabase Connection</h3>
-                                    <p className="text-xs text-gray-400 font-bold">Live Database Integration</p>
+                                    <h3 className="font-black text-lg sm:text-xl text-gray-900">Supabase Connection</h3>
+                                    <p className="text-[10px] sm:text-xs text-gray-400 font-bold">Live Database Integration</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                            <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer p-1">
                                 <i className="fa-solid fa-xmark text-lg"></i>
                             </button>
                         </div>
@@ -860,19 +1043,19 @@ function Auction() {
 
             {/* SQL SCRIPT GUIDE MODAL */}
             {showSqlGuide && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+                    <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 max-w-3xl w-full shadow-2xl border border-gray-100 max-h-[92vh] flex flex-col">
+                        <div className="flex justify-between items-center mb-3 sm:mb-4">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
                                     <i className="fa-solid fa-code"></i>
                                 </div>
                                 <div>
-                                    <h3 className="font-black text-xl text-gray-900">Supabase SQL Setup</h3>
-                                    <p className="text-xs text-gray-400 font-bold">Run in Supabase &rarr; SQL Editor</p>
+                                    <h3 className="font-black text-lg sm:text-xl text-gray-900">Supabase SQL Setup</h3>
+                                    <p className="text-[10px] sm:text-xs text-gray-400 font-bold">Run in Supabase &rarr; SQL Editor</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowSqlGuide(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                            <button onClick={() => setShowSqlGuide(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer p-1">
                                 <i className="fa-solid fa-xmark text-lg"></i>
                             </button>
                         </div>
@@ -1090,14 +1273,14 @@ alter publication supabase_realtime add table team_bids;
 alter publication supabase_realtime add table teams;`);
                                     setShowSqlGuide(false);
                                 }}
-                                className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm"
+                                className="w-full sm:w-auto px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm"
                             >
                                 <i className="fa-solid fa-copy"></i> Copy Script
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setShowSqlGuide(false)}
-                                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer"
+                                className="w-full sm:w-auto px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center"
                             >
                                 Close
                             </button>

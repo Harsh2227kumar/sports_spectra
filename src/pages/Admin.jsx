@@ -452,47 +452,47 @@ function Admin() {
         <div className="min-h-screen bg-[#F8FAFC] pb-24">
             {/* TOP NAVIGATION */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
-                <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
-                    <div className="flex items-center gap-4">
-                        <div className="bg-orange-500 text-white p-2.5 rounded-xl shadow-sm">
-                            <i className="fa-solid fa-gavel text-lg"></i>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="bg-orange-500 text-white p-2 sm:p-2.5 rounded-xl shadow-xs shrink-0">
+                            <i className="fa-solid fa-gavel text-base sm:text-lg"></i>
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
-                                <span className="font-black text-gray-900 text-lg tracking-tight">SPORTS SPECTRA 4.0</span>
-                                <span className="bg-orange-100 text-orange-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">Auction Bidding</span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black text-gray-900 text-base sm:text-lg tracking-tight">SPORTS SPECTRA 4.0</span>
+                                <span className="bg-orange-100 text-orange-700 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full">Auction Bidding</span>
                             </div>
-                            <p className="text-xs text-gray-500">Live Player Draft & Team Bidding Desk</p>
+                            <p className="text-[11px] sm:text-xs text-gray-500">Live Player Draft & Team Bidding Desk</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <button onClick={() => setShowConfigModal(true)} className="px-3.5 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition flex items-center gap-2 cursor-pointer">
+                    <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full md:w-auto">
+                        <button onClick={() => setShowConfigModal(true)} className="px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer">
                             <span className={`w-2 h-2 rounded-full ${dbStatus.connected ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`}></span>
-                            Database: {dbStatus.connected ? `${dbStatus.latency}ms` : 'Disconnected'}
+                            <span className="hidden xs:inline">DB:</span> {dbStatus.connected ? `${dbStatus.latency}ms` : 'Disconnected'}
                         </button>
-                        <Link to="/doremon/import-export" className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-2">
-                            <i className="fa-solid fa-file-import text-orange-500"></i> Import / Export
+                        <Link to="/doremon/import-export" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
+                            <i className="fa-solid fa-file-import text-orange-500"></i> <span className="hidden xs:inline">Import /</span> Export
                         </Link>
-                        <Link to="/auction" className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white hover:bg-orange-600 transition flex items-center gap-2 shadow-sm">
-                            <i className="fa-solid fa-trophy"></i> Live Dashboard
+                        <Link to="/auction" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-orange-500 text-white hover:bg-orange-600 transition flex items-center gap-1.5 sm:gap-2 shadow-xs">
+                            <i className="fa-solid fa-trophy"></i> Dashboard
                         </Link>
-                        <button onClick={handleLogout} className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition flex items-center gap-1.5 cursor-pointer">
+                        <button onClick={handleLogout} className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition flex items-center gap-1 cursor-pointer ml-auto md:ml-0">
                             <i className="fa-solid fa-right-from-bracket"></i> Logout
                         </button>
                     </div>
                 </div>
             </header>
 
-            <main className="max-w-7xl mx-auto px-6 pt-8 flex flex-col gap-8">
+            <main className="max-w-7xl mx-auto px-3.5 sm:px-6 pt-4 sm:pt-8 flex flex-col gap-6 sm:gap-8">
                 {/* SUCCESS NOTIFICATION */}
                 {showSuccess && (
-                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-6 py-4 rounded-2xl flex items-center justify-between shadow-xs">
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl flex items-center justify-between shadow-xs">
                         <div className="flex items-center gap-3">
-                            <i className="fa-solid fa-circle-check text-emerald-500 text-xl"></i>
-                            <span className="font-bold text-sm">{successMsg}</span>
+                            <i className="fa-solid fa-circle-check text-emerald-500 text-lg sm:text-xl shrink-0"></i>
+                            <span className="font-bold text-xs sm:text-sm">{successMsg}</span>
                         </div>
-                        <button onClick={() => setShowSuccess(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                        <button onClick={() => setShowSuccess(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer p-1">
                             <i className="fa-solid fa-xmark"></i>
                         </button>
                     </div>
@@ -500,27 +500,27 @@ function Admin() {
 
                 {/* ERROR NOTIFICATION */}
                 {errorMessage && (
-                    <div className="bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-2xl flex items-center justify-between shadow-xs">
+                    <div className="bg-red-50 border border-red-200 text-red-800 px-4 sm:px-6 py-3 sm:py-4 rounded-2xl flex items-center justify-between shadow-xs">
                         <div className="flex items-center gap-3">
-                            <i className="fa-solid fa-triangle-exclamation text-red-500 text-xl"></i>
-                            <span className="font-bold text-sm">{errorMessage}</span>
+                            <i className="fa-solid fa-triangle-exclamation text-red-500 text-lg sm:text-xl shrink-0"></i>
+                            <span className="font-bold text-xs sm:text-sm">{errorMessage}</span>
                         </div>
-                        <button onClick={() => setErrorMessage(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                        <button onClick={() => setErrorMessage(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer p-1">
                             <i className="fa-solid fa-xmark"></i>
                         </button>
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
                     {/* LEFT COLUMN: BIDDING DESK FORM */}
                     <div className="lg:col-span-6 flex flex-col gap-6">
-                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm relative">
-                            <div className="flex justify-between items-center mb-6">
+                        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-gray-200 shadow-xs relative">
+                            <div className="flex justify-between items-center mb-5 sm:mb-6">
                                 <div>
-                                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                                    <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
                                         {editBidId ? 'Edit Team Bid' : 'Record Auction Bid'}
                                     </h2>
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">
+                                    <p className="text-[10px] sm:text-xs text-gray-400 font-bold uppercase tracking-wider mt-0.5 sm:mt-1">
                                         Type player name to autocomplete from database
                                     </p>
                                 </div>
@@ -725,13 +725,13 @@ function Admin() {
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-6">
                                 {teamSpending.map(t => {
                                     const percent = t.totalPurse > 0 ? Math.min(100, Math.round((t.spent / t.totalPurse) * 100)) : 0;
                                     return (
-                                        <div key={t.name} className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+                                        <div key={t.name} className="p-3 sm:p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
                                             <div className="flex justify-between items-center mb-1">
-                                                <span className="font-bold text-gray-900 text-xs">{t.name}</span>
+                                                <span className="font-bold text-gray-900 text-xs truncate max-w-[120px]">{t.name}</span>
                                                 <span className="text-[10px] font-bold text-gray-500">{t.playerCount} drafted</span>
                                             </div>
                                             <div className="flex justify-between items-baseline mb-2">
@@ -746,7 +746,7 @@ function Admin() {
                                 })}
                             </div>
 
-                            <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                            <div className="pt-4 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
                                 <span className="text-xs font-bold text-gray-500">Total Spent Across All Teams:</span>
                                 <span className="text-base font-black text-gray-900">
                                     ₹{teamBids.reduce((sum, b) => sum + Number(b.bidAmount || 0), 0).toLocaleString('en-IN')}
@@ -756,12 +756,12 @@ function Admin() {
                     </div>
                 </div>
 
-                {/* BOTTOM SECTION: RECENT AUCTION BIDS TABLE */}
-                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="p-6 md:p-8 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
+                {/* BOTTOM SECTION: RECENT AUCTION BIDS TABLE / CARDS */}
+                <div className="bg-white rounded-2xl sm:rounded-3xl border border-gray-200 shadow-xs overflow-hidden">
+                    <div className="p-4 sm:p-6 md:p-8 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 sm:gap-4">
                         <div>
-                            <h3 className="text-xl font-black text-gray-900 tracking-tight">Recorded Auction Bids ({teamBids.length})</h3>
-                            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                            <h3 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight">Recorded Auction Bids ({teamBids.length})</h3>
+                            <p className="text-[11px] sm:text-xs text-gray-400 font-bold uppercase tracking-wider mt-0.5">
                                 Real-time bidding records stored in Supabase
                             </p>
                         </div>
@@ -769,7 +769,7 @@ function Admin() {
                         {teamBids.length > 0 && (
                             <button
                                 onClick={() => setShowClearConfirm(true)}
-                                className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer"
+                                className="px-3.5 sm:px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold rounded-xl transition flex items-center gap-1.5 sm:gap-2 cursor-pointer ml-auto sm:ml-0"
                             >
                                 <i className="fa-solid fa-trash-can"></i> Clear All Bids
                             </button>
@@ -777,84 +777,123 @@ function Admin() {
                     </div>
 
                     {teamBids.length === 0 ? (
-                        <div className="text-center py-16 text-gray-400">
-                            <i className="fa-solid fa-inbox text-4xl mb-3 text-gray-300"></i>
+                        <div className="text-center py-12 sm:py-16 text-gray-400 px-4">
+                            <i className="fa-solid fa-inbox text-3xl sm:text-4xl mb-3 text-gray-300"></i>
                             <p className="font-bold text-sm text-gray-600">No auction bids recorded in database yet.</p>
                             <p className="text-xs mt-1">Use the form above to draft players to franchises.</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50 border-b border-gray-100">
-                                    <tr>
-                                        <th className="px-6 py-4 font-bold">Player Name</th>
-                                        <th className="px-6 py-4 font-bold">Team</th>
-                                        <th className="px-6 py-4 font-bold">Role</th>
-                                        <th className="px-6 py-4 font-bold text-right">Bid Amount</th>
-                                        <th className="px-6 py-4 font-bold text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {teamBids.map(bid => (
-                                        <tr key={bid.id} className="hover:bg-gray-50/80 transition">
-                                            <td className="px-6 py-4 font-bold text-gray-900">{bid.playerName}</td>
-                                            <td className="px-6 py-4">
-                                                <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2.5 py-1 rounded-lg">
-                                                    {bid.team}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-gray-600 text-xs font-medium">{bid.role || 'Player'}</td>
-                                            <td className="px-6 py-4 font-black text-gray-900 text-right">
+                        <>
+                            {/* MOBILE CARD VIEW (< md) */}
+                            <div className="md:hidden divide-y divide-gray-100">
+                                {teamBids.map(bid => (
+                                    <div key={bid.id} className="p-4 flex flex-col gap-2.5 hover:bg-gray-50/60 transition">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 text-sm">{bid.playerName}</h4>
+                                                <p className="text-xs text-gray-500">{bid.role || 'Player'}</p>
+                                            </div>
+                                            <span className="text-base font-black text-orange-600">
                                                 ₹{Number(bid.bidAmount || 0).toLocaleString('en-IN')}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => handleEditBid(bid)}
-                                                        className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-orange-600 flex items-center justify-center transition cursor-pointer"
-                                                        title="Edit Bid"
-                                                    >
-                                                        <i className="fa-solid fa-pen text-xs"></i>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => setDeleteConfirmBid(bid)}
-                                                        className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center transition cursor-pointer"
-                                                        title="Delete Bid"
-                                                    >
-                                                        <i className="fa-solid fa-trash text-xs"></i>
-                                                    </button>
-                                                </div>
-                                            </td>
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-1">
+                                            <span className="bg-orange-100 text-orange-800 text-[11px] font-bold px-2.5 py-0.5 rounded-lg">
+                                                {bid.team}
+                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleEditBid(bid)}
+                                                    className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-600 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                                                >
+                                                    <i className="fa-solid fa-pen text-[10px]"></i> Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeleteConfirmBid(bid)}
+                                                    className="px-3 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                                                >
+                                                    <i className="fa-solid fa-trash text-[10px]"></i> Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* DESKTOP TABLE VIEW (>= md) */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50 border-b border-gray-100">
+                                        <tr>
+                                            <th className="px-6 py-4 font-bold">Player Name</th>
+                                            <th className="px-6 py-4 font-bold">Team</th>
+                                            <th className="px-6 py-4 font-bold">Role</th>
+                                            <th className="px-6 py-4 font-bold text-right">Bid Amount</th>
+                                            <th className="px-6 py-4 font-bold text-center">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {teamBids.map(bid => (
+                                            <tr key={bid.id} className="hover:bg-gray-50/80 transition">
+                                                <td className="px-6 py-4 font-bold text-gray-900">{bid.playerName}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2.5 py-1 rounded-lg">
+                                                        {bid.team}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-600 text-xs font-medium">{bid.role || 'Player'}</td>
+                                                <td className="px-6 py-4 font-black text-gray-900 text-right">
+                                                    ₹{Number(bid.bidAmount || 0).toLocaleString('en-IN')}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            onClick={() => handleEditBid(bid)}
+                                                            className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-orange-600 flex items-center justify-center transition cursor-pointer"
+                                                            title="Edit Bid"
+                                                        >
+                                                            <i className="fa-solid fa-pen text-xs"></i>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setDeleteConfirmBid(bid)}
+                                                            className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center transition cursor-pointer"
+                                                            title="Delete Bid"
+                                                        >
+                                                            <i className="fa-solid fa-trash text-xs"></i>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
                     )}
                 </div>
             </main>
 
             {/* DELETE CONFIRM MODAL */}
             {deleteConfirmBid && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 text-center">
-                        <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto mb-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+                    <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-md w-full shadow-2xl border border-gray-100 text-center">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl sm:text-2xl mx-auto mb-4">
                             <i className="fa-solid fa-trash-can"></i>
                         </div>
-                        <h3 className="font-black text-xl text-gray-900 mb-2">Remove Bid?</h3>
+                        <h3 className="font-black text-lg sm:text-xl text-gray-900 mb-2">Remove Bid?</h3>
                         <p className="text-gray-500 text-xs mb-6">
                             Are you sure you want to remove the bid for <strong>{deleteConfirmBid.playerName}</strong> ({deleteConfirmBid.team})? The player will return to the unsold pool.
                         </p>
-                        <div className="flex gap-3">
+                        <div className="flex gap-2.5 sm:gap-3">
                             <button
                                 onClick={() => setDeleteConfirmBid(null)}
-                                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm cursor-pointer"
+                                className="flex-1 py-2.5 sm:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmDeleteBid}
-                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm cursor-pointer shadow-md shadow-red-500/20"
+                                className="flex-1 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer shadow-md shadow-red-500/20"
                             >
                                 Delete Bid
                             </button>
@@ -865,25 +904,25 @@ function Admin() {
 
             {/* CLEAR ALL BIDS MODAL */}
             {showClearConfirm && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 text-center">
-                        <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto mb-4">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+                    <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-md w-full shadow-2xl border border-gray-100 text-center">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl sm:text-2xl mx-auto mb-4">
                             <i className="fa-solid fa-triangle-exclamation"></i>
                         </div>
-                        <h3 className="font-black text-xl text-gray-900 mb-2">Clear All Bids?</h3>
+                        <h3 className="font-black text-lg sm:text-xl text-gray-900 mb-2">Clear All Bids?</h3>
                         <p className="text-gray-500 text-xs mb-6">
                             This will permanently delete all {teamBids.length} auction bids from the database and reset all franchise rosters.
                         </p>
-                        <div className="flex gap-3">
+                        <div className="flex gap-2.5 sm:gap-3">
                             <button
                                 onClick={() => setShowClearConfirm(false)}
-                                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm cursor-pointer"
+                                className="flex-1 py-2.5 sm:py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs sm:text-sm cursor-pointer"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={confirmClearAllBids}
-                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm cursor-pointer shadow-md shadow-red-500/20"
+                                className="flex-1 py-2.5 sm:py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs sm:text-sm cursor-pointer shadow-md shadow-red-500/20"
                             >
                                 Yes, Clear All
                             </button>
@@ -894,19 +933,19 @@ function Admin() {
 
             {/* SUPABASE CONFIG MODAL */}
             {showConfigModal && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-gray-100">
-                        <div className="flex justify-between items-center mb-6">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+                    <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-100">
+                        <div className="flex justify-between items-center mb-5 sm:mb-6">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
+                                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
                                     <i className="fa-solid fa-database"></i>
                                 </div>
                                 <div>
-                                    <h3 className="font-black text-xl text-gray-900">Supabase Connection</h3>
-                                    <p className="text-xs text-gray-400 font-bold">Live PostgreSQL Database</p>
+                                    <h3 className="font-black text-lg sm:text-xl text-gray-900">Supabase Connection</h3>
+                                    <p className="text-[10px] sm:text-xs text-gray-400 font-bold">Live PostgreSQL Database</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                            <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer p-1">
                                 <i className="fa-solid fa-xmark text-lg"></i>
                             </button>
                         </div>

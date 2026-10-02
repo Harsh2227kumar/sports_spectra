@@ -523,39 +523,39 @@ export default function DataImportExport() {
     <div className="min-h-screen bg-[#F8FAFC] pb-24">
       {/* TOP NAVIGATION BAR */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-4">
-            <div className="bg-orange-500 text-white p-2.5 rounded-xl shadow-sm">
-              <i className="fa-solid fa-database text-lg"></i>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="bg-orange-500 text-white p-2 sm:p-2.5 rounded-xl shadow-xs shrink-0">
+              <i className="fa-solid fa-database text-base sm:text-lg"></i>
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-gray-900 text-lg tracking-tight">SPORTS SPECTRA 4.0</span>
-                <span className="bg-orange-100 text-orange-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">Data Center</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-gray-900 text-base sm:text-lg tracking-tight">SPORTS SPECTRA 4.0</span>
+                <span className="bg-orange-100 text-orange-700 text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-full">Data Center</span>
               </div>
-              <p className="text-xs text-gray-500">Player Data Import/Export & Registry Manager</p>
+              <p className="text-[11px] sm:text-xs text-gray-500">Player Data Import/Export & Registry Manager</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Link to="/doremon" className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-2">
-              <i className="fa-solid fa-gavel text-orange-500"></i> Auction Bidding
+          <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full sm:w-auto">
+            <Link to="/doremon" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
+              <i className="fa-solid fa-gavel text-orange-500"></i> Bidding Desk
             </Link>
-            <Link to="/auction" className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-2">
+            <Link to="/auction" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
               <i className="fa-solid fa-trophy text-orange-500"></i> Live Dashboard
             </Link>
-            <button onClick={handleLogout} className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition flex items-center gap-1.5 cursor-pointer">
+            <button onClick={handleLogout} className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition flex items-center gap-1 cursor-pointer ml-auto sm:ml-0">
               <i className="fa-solid fa-right-from-bracket"></i> Logout
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 pt-8 flex flex-col gap-8">
+      <main className="max-w-7xl mx-auto px-3.5 sm:px-6 pt-4 sm:pt-8 flex flex-col gap-6 sm:gap-8">
         {/* DATABASE STATUS BAR */}
-        <section className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <div className="flex items-start gap-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shrink-0 ${
+        <section className="bg-white rounded-2xl p-4 sm:p-6 border border-gray-200 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-lg sm:text-xl shrink-0 ${
               dbStatus.loading ? 'bg-blue-50 text-blue-500' :
               dbStatus.connected ? 'bg-emerald-50 text-emerald-600' :
               'bg-amber-50 text-amber-600'
@@ -567,19 +567,19 @@ export default function DataImportExport() {
               }`}></i>
             </div>
             <div>
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h3 className="font-bold text-gray-900 text-base">Database Status</h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-gray-900 text-sm sm:text-base">Database Status</h3>
                 {dbStatus.loading ? (
-                  <span className="bg-blue-100 text-blue-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span> Testing Connection...
+                  <span className="bg-blue-100 text-blue-800 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span> Testing...
                   </span>
                 ) : dbStatus.connected ? (
-                  <span className="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Live Supabase Connected ({dbStatus.latency}ms)
+                  <span className="bg-emerald-100 text-emerald-800 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Live Supabase Connected ({dbStatus.latency}ms)
                   </span>
                 ) : (
-                  <span className="bg-amber-100 text-amber-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span> Local Storage / Mock Mode
+                  <span className="bg-amber-100 text-amber-800 text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Local Storage / Mock Mode
                   </span>
                 )}
               </div>
@@ -591,28 +591,28 @@ export default function DataImportExport() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+          <div className="flex items-center gap-2 sm:gap-3 w-full md:w-auto flex-wrap">
             <button 
               onClick={() => setShowConfigModal(true)}
-              className="px-4 py-2 text-xs font-bold bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-xs"
+              className="px-3 sm:px-4 py-2 text-xs font-bold bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-xl transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs"
             >
               <i className="fa-solid fa-gear text-orange-500"></i>
-              Configure Connection
+              Configure
             </button>
             <button 
               onClick={() => { refreshDbStatus(); loadPlayersFromDb(); }}
               disabled={dbStatus.loading}
-              className="px-4 py-2 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-3 sm:px-4 py-2 text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-xl transition flex items-center gap-1.5 sm:gap-2 cursor-pointer disabled:opacity-50"
             >
               <i className={`fa-solid fa-arrows-rotate ${dbStatus.loading ? 'fa-spin' : ''}`}></i>
-              Refresh Status
+              Refresh
             </button>
             <button 
               onClick={() => setShowSqlModal(true)}
-              className="px-4 py-2 text-xs font-bold bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 rounded-xl transition flex items-center gap-2 cursor-pointer"
+              className="px-3 sm:px-4 py-2 text-xs font-bold bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200 rounded-xl transition flex items-center gap-1.5 sm:gap-2 cursor-pointer"
             >
               <i className="fa-solid fa-code"></i>
-              SQL Schema Helper
+              SQL Helper
             </button>
           </div>
         </section>
@@ -1517,19 +1517,19 @@ alter publication supabase_realtime add table teams;`);
 
       {/* SUPABASE CONNECTION CONFIG MODAL */}
       {showConfigModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-gray-100">
-            <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-2xl border border-gray-100">
+            <div className="flex justify-between items-center mb-5 sm:mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
                   <i className="fa-solid fa-database"></i>
                 </div>
                 <div>
-                  <h3 className="font-black text-xl text-gray-900">Database Connection</h3>
-                  <p className="text-xs text-gray-400 font-bold">Supabase PostgreSQL Integration</p>
+                  <h3 className="font-black text-lg sm:text-xl text-gray-900">Database Connection</h3>
+                  <p className="text-[10px] sm:text-xs text-gray-400 font-bold">Supabase PostgreSQL Integration</p>
                 </div>
               </div>
-              <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+              <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer p-1">
                 <i className="fa-solid fa-xmark text-lg"></i>
               </button>
             </div>
