@@ -38,7 +38,7 @@ function Admin() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const suggestionsRef = useRef(null);
     const fileInputRef = useRef(null);
-    
+
     // Form state
     const [formData, setFormData] = useState({
         team: 'ONE EIGHT CHALLENGERS',
@@ -273,11 +273,11 @@ function Admin() {
                 try {
                     const { error } = await supabase.from('players').insert(uniqueNewPlayers);
                     if (error) throw error;
-                    
+
                     const ignoredCount = normalized.length - uniqueNewPlayers.length;
                     const ignoreMsg = ignoredCount > 0 ? ` (${ignoredCount} duplicates ignored)` : '';
                     alert(`Successfully imported ${uniqueNewPlayers.length} new players to Supabase!${ignoreMsg}`);
-                    
+
                     addAdminLog('CSV_UPLOAD', `Uploaded CSV file with ${uniqueNewPlayers.length} new players`);
                     addEventLog('BULK_IMPORT', 'CSV Upload', `Imported ${uniqueNewPlayers.length} new players to database as UNSOLD`, 'UNSOLD', 0, `CSV Import: ${uniqueNewPlayers.length} players inserted (${ignoredCount} duplicates skipped)`);
 
@@ -291,7 +291,7 @@ function Admin() {
                 alert("Error parsing CSV: " + error.message);
             }
         });
-        
+
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -335,7 +335,7 @@ function Admin() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!isAuthenticated) return;
-        
+
         const existingPlayer = players.find(p => p.name.toLowerCase() === formData.playerName.trim().toLowerCase());
         const isUpdate = editPlayerId || (existingPlayer && existingPlayer.team === 'UNSOLD');
         const targetId = editPlayerId || (existingPlayer ? existingPlayer.id : null);
@@ -394,7 +394,7 @@ function Admin() {
 
         setShowSuccess(true);
         setTimeout(() => setShowSuccess(false), 3000);
-        
+
         setFormData({
             team: 'ONE EIGHT CHALLENGERS',
             role: 'Player',
@@ -509,7 +509,7 @@ function Admin() {
         if (window.confirm("Are you sure you want to clear all admin logs in Supabase?")) {
             try {
                 await supabase.from('admin_logs').delete().neq('id', 0);
-            } catch (e) {}
+            } catch (e) { }
             setAdminLogs([]);
         }
     };
@@ -520,7 +520,7 @@ function Admin() {
         if (window.confirm("Are you sure you want to clear all event logs in Supabase?")) {
             try {
                 await supabase.from('event_logs').delete().neq('id', 0);
-            } catch (e) {}
+            } catch (e) { }
             setEventLogs([]);
         }
     };
@@ -551,17 +551,18 @@ function Admin() {
                     </div>
                     <h1 className="text-3xl font-black text-gray-900 text-center mb-2">Admin Login</h1>
                     <p className="text-gray-500 text-sm text-center mb-8">Authenticate with your Supabase server credentials.</p>
-                    
+
                     <form onSubmit={handleLogin} className="flex flex-col gap-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Email</label>
-                            <input 
-                                type="email" 
+                            <input
+                                type="email"
                                 value={emailInput}
                                 onChange={(e) => {
                                     setEmailInput(e.target.value);
                                     setLoginError('');
                                 }}
+                                placeholder="Enter Email"
                                 className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl p-3.5 text-sm font-medium focus:outline-none transition"
                                 required
                                 autoFocus
@@ -570,14 +571,14 @@ function Admin() {
 
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
-                            <input 
-                                type="password" 
+                            <input
+                                type="password"
                                 value={passwordInput}
                                 onChange={(e) => {
                                     setPasswordInput(e.target.value);
                                     setLoginError('');
                                 }}
-                                placeholder="Enter Admin Password" 
+                                placeholder="Enter Admin Password"
                                 className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl p-3.5 text-sm font-medium focus:outline-none transition"
                                 required
                             />
@@ -589,8 +590,8 @@ function Admin() {
                             </div>
                         )}
 
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             disabled={isAuthenticating}
                             className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-base py-4 rounded-xl transition shadow-lg shadow-orange-200 mt-2 flex items-center justify-center gap-2"
                         >
@@ -630,7 +631,7 @@ function Admin() {
     return (
         <div className="p-4 md:p-10 text-gray-800 bg-gray-50 min-h-screen">
             <div className="max-w-6xl mx-auto space-y-8">
-                
+
                 {/* HEADER */}
                 <div className="bg-gradient-to-r from-orange-600 to-orange-500 p-6 md:p-8 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div>
@@ -643,7 +644,7 @@ function Admin() {
                         <span className="bg-black/20 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 backdrop-blur">
                             <i className="fa-solid fa-user-check text-emerald-400"></i> {currentUserEmail}
                         </span>
-                        <button 
+                        <button
                             onClick={handleLogout}
                             className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-full text-xs font-bold transition flex items-center gap-1.5 backdrop-blur"
                         >
@@ -678,7 +679,7 @@ function Admin() {
                             </label>
                         </div>
                     </div>
-                    
+
                     <form onSubmit={handleSubmit} className="p-6 md:p-8 flex flex-col gap-5">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
@@ -795,7 +796,7 @@ function Admin() {
                             <i className={`fa-solid ${editPlayerId ? 'fa-pen-to-square' : 'fa-gavel'}`}></i>
                             {editPlayerId ? "Update Player Bid in Supabase" : "Save Bid to Supabase"}
                         </button>
-                        
+
                         {editPlayerId && (
                             <button type="button" onClick={() => {
                                 setEditPlayerId(null);
@@ -819,7 +820,7 @@ function Admin() {
                             <i className="fa-solid fa-trash-can"></i> Reset All Drafted Players
                         </button>
                     </div>
-                    
+
                     <div className="flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1">
                         {players.filter(p => p.team !== 'UNSOLD').length === 0 ? (
                             <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-400 font-medium text-sm">
@@ -854,7 +855,7 @@ function Admin() {
 
                 {/* AUDIT LOGS SECTION - SUPABASE DIRECT */}
                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-gray-100 space-y-6">
-                    
+
                     {/* Log Header & Controls */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
                         <div>
