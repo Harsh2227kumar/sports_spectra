@@ -1381,20 +1381,15 @@ create policy "Admins can delete teams" on teams for delete using (true);
 -- 5. Insert / Update Official Franchises & Retained Leaders
 insert into teams (name, total_purse, logo_url, color, text_color, from_color, captain_name, captain_gender, captain_initials, captain_color, captain_photo, vice_captain_name, vice_captain_gender, vice_captain_initials, vice_captain_color, vice_captain_photo, display_order)
 values 
-  ('ONE EIGHT CHALLENGERS', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'Shriya Yerane', 'F', 'SY', '#2196F3', '', 1),
-  ('TEAM 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Mahek Malkan', 'F', 'MM', '#BA68C8', '', 2),
-  ('ASTRA', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
-  ('BRAVO', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
-  ('HELLFIRE', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
-  ('AUREX', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '/manthan.png', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
-  ('TITANS', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth Tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
-  ('NEMESIS', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
-on conflict (name) do update set
-  captain_name = excluded.captain_name,
-  vice_captain_name = excluded.vice_captain_name,
-  captain_gender = excluded.captain_gender,
-  vice_captain_gender = excluded.vice_captain_gender,
-  display_order = excluded.display_order;
+  ('Team 1', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'SHRIYA YERANE', 'F', 'SY', '#2196F3', '', 1),
+  ('Team 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Mahek Malkan', 'F', 'MM', '#BA68C8', '', 2),
+  ('Team 3', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
+  ('Team 4', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
+  ('Team 5', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
+  ('Team 6', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '/manthan.png', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
+  ('Team 7', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
+  ('Team 8', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
+on conflict (name) do nothing;
 
 -- 6. Enable Realtime Broadcasting
 alter publication supabase_realtime add table players;
@@ -1488,20 +1483,15 @@ create policy "Admins can delete teams" on teams for delete using (true);
 -- 5. Insert / Update Official Franchises & Retained Leaders
 insert into teams (name, total_purse, logo_url, color, text_color, from_color, captain_name, captain_gender, captain_initials, captain_color, captain_photo, vice_captain_name, vice_captain_gender, vice_captain_initials, vice_captain_color, vice_captain_photo, display_order)
 values 
-  ('ONE EIGHT CHALLENGERS', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'Shriya Yerane', 'F', 'SY', '#2196F3', '', 1),
-  ('TEAM 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Mahek Malkan', 'F', 'MM', '#BA68C8', '', 2),
-  ('ASTRA', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
-  ('BRAVO', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
-  ('HELLFIRE', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
-  ('AUREX', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '/manthan.png', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
-  ('TITANS', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth Tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
-  ('NEMESIS', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
-on conflict (name) do update set
-  captain_name = excluded.captain_name,
-  vice_captain_name = excluded.vice_captain_name,
-  captain_gender = excluded.captain_gender,
-  vice_captain_gender = excluded.vice_captain_gender,
-  display_order = excluded.display_order;
+  ('Team 1', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'SHRIYA YERANE', 'F', 'SY', '#2196F3', '', 1),
+  ('Team 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Mahek Malkan', 'F', 'MM', '#BA68C8', '', 2),
+  ('Team 3', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
+  ('Team 4', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
+  ('Team 5', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
+  ('Team 6', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '/manthan.png', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
+  ('Team 7', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
+  ('Team 8', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
+on conflict (name) do nothing;
 
 -- 6. Enable Realtime Broadcasting
 alter publication supabase_realtime add table players;

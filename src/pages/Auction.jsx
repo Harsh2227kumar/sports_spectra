@@ -3,7 +3,7 @@ import {
   supabase, 
   getLocalTeams, 
   saveLocalTeams, 
-  checkDatabaseConnection,
+  testSupabaseConnection,
   getSupabaseConfig,
   updateCustomSupabaseCredentials
 } from '../supabaseClient';
@@ -26,6 +26,10 @@ function Auction() {
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [configInputUrl, setConfigInputUrl] = useState(() => getSupabaseConfig().url);
     const [configInputKey, setConfigInputKey] = useState(() => getSupabaseConfig().key);
+    const [isTestingConn, setIsTestingConn] = useState(false);
+    const [testResult, setTestResult] = useState(null);
+    const [isSavingConn, setIsSavingConn] = useState(false);
+    const [showSqlGuide, setShowSqlGuide] = useState(false);
 
     const handleTeamClick = (teamName) => {
         if (activeTeam === teamName) return;
@@ -38,17 +42,58 @@ function Auction() {
         if (!isBackground) setIsPageLoading(true);
         else setIsSyncing(true);
 
+        const startTime = performance.now();
         try {
-            // Check connection status
-            const status = await checkDatabaseConnection();
-            setDbStatus(status);
-
             // Fetch players, bids, and teams dynamically from the database
             const [playersRes, bidsRes, teamsRes] = await Promise.all([
                 supabase.from('players').select('*'),
                 supabase.from('team_bids').select('*'),
                 supabase.from('teams').select('*').order('display_order')
             ]);
+
+            const latency = Math.max(1, Math.round(performance.now() - startTime));
+
+            // Check connection status based on actual live queries
+            const config = getSupabaseConfig();
+            if (!config.isValid) {
+                setDbStatus({
+                    connected: false,
+                    isMock: true,
+                    latency: 0,
+                    message: 'Database not connected. Please enter your Supabase Project URL and Anon API Key.'
+                });
+            } else {
+                const anyError = playersRes.error || bidsRes.error || teamsRes.error;
+                if (anyError) {
+                    if (anyError.code === 'PGRST301' || anyError.message?.includes('JWT') || anyError.message?.includes('apikey') || anyError.code === '401' || anyError.code === '403') {
+                        setDbStatus({
+                            connected: false,
+                            latency,
+                            message: 'Authentication failed. Please verify your Supabase Anon API Key.'
+                        });
+                    } else if (anyError.message?.includes('does not exist') || anyError.message?.includes('relation')) {
+                        setDbStatus({
+                            connected: true,
+                            hasMissingTables: true,
+                            latency,
+                            message: 'Connected to Supabase! Tables not created yet. Please execute the SQL setup script.'
+                        });
+                    } else {
+                        setDbStatus({
+                            connected: false,
+                            latency,
+                            message: `Query error: ${anyError.message}`
+                        });
+                    }
+                } else {
+                    setDbStatus({
+                        connected: true,
+                        latency,
+                        hasMissingTables: false,
+                        message: `Live Supabase connection active (${latency}ms)`
+                    });
+                }
+            }
 
             // 1. Process Teams from database
             if (!teamsRes.error && teamsRes.data && teamsRes.data.length > 0) {
@@ -60,16 +105,18 @@ function Auction() {
             const dbPlayers = playersRes.data || [];
             const dbBids = bidsRes.data || [];
 
-            // Map bids by player name (case-insensitive)
-            const bidsMap = new Map();
+            // Map bids by player name (case-insensitive) and player id
+            const bidsByName = new Map();
+            const bidsById = new Map();
             dbBids.forEach(b => {
-                if (b.player_name) bidsMap.set(b.player_name.trim().toLowerCase(), b);
-                if (b.player_id) bidsMap.set(String(b.player_id), b);
+                if (b.player_name) bidsByName.set(b.player_name.trim().toLowerCase(), b);
+                if (b.player_id) bidsById.set(String(b.player_id), b);
             });
 
             const mappedData = dbPlayers.map(p => {
-                const bid = bidsMap.get(p.name?.trim().toLowerCase()) || bidsMap.get(String(p.id));
-                const assignedTeam = bid ? bid.team : (p.team && p.team !== 'UNSOLD' ? p.team : 'UNSOLD');
+                const nameKey = p.name ? p.name.trim().toLowerCase() : '';
+                const bid = bidsByName.get(nameKey) || bidsById.get(String(p.id));
+                const assignedTeam = bid?.team || (p.team && p.team !== 'UNSOLD' ? p.team : 'UNSOLD');
                 const winningBid = bid ? Number(bid.bid_amount || 0) : Number(p.bid_amount || 0);
 
                 return {
@@ -87,7 +134,7 @@ function Auction() {
             });
 
             // Include any bids from team_bids whose players might not be in players table
-            const existingNames = new Set(dbPlayers.map(p => p.name?.trim().toLowerCase()));
+            const existingNames = new Set(dbPlayers.map(p => p.name ? p.name.trim().toLowerCase() : ''));
             dbBids.forEach(b => {
                 if (b.player_name && !existingNames.has(b.player_name.trim().toLowerCase())) {
                     mappedData.push({
@@ -108,6 +155,11 @@ function Auction() {
             setPlayers(mappedData);
         } catch (err) {
             console.warn("[Sports Spectra] Error loading live auction data:", err);
+            setDbStatus(prev => ({
+                ...prev,
+                connected: false,
+                message: err.message || 'Database connection error'
+            }));
         } finally {
             setIsPageLoading(false);
             setIsSyncing(false);
@@ -117,10 +169,10 @@ function Auction() {
     useEffect(() => {
         // Immediate purge of any old mock data from previous tests
         try {
-            const staleKeys = ['team_bids', 'auctionPlayers', 'master_players'];
+            const staleKeys = ['auctionPlayers'];
             staleKeys.forEach(k => {
                 const val = localStorage.getItem(k);
-                if (val && (val.includes('2700') || val.includes('7300') || val.includes('4 MEMBERS') || val.includes('b1'))) {
+                if (val && (val.includes('2700') || val.includes('7300') || val.includes('b1'))) {
                     localStorage.removeItem(k);
                 }
             });
@@ -131,10 +183,10 @@ function Auction() {
             fetchAllAuctionData(false);
         }, 0);
 
-        // Continuous high-frequency polling (every 1.5 seconds) to detect any database changes instantly
+        // Continuous polling (every 2.5 seconds) to detect any database changes
         const pollInterval = setInterval(() => {
             fetchAllAuctionData(true);
-        }, 1500);
+        }, 2500);
 
         // Instant refresh on tab focus / visibility
         const handleVisibilityOrFocus = () => {
@@ -142,6 +194,15 @@ function Auction() {
         };
         window.addEventListener('focus', handleVisibilityOrFocus);
         document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+        // Instant refresh on credentials change
+        const handleCredsChanged = () => {
+            const freshConfig = getSupabaseConfig();
+            setConfigInputUrl(freshConfig.url);
+            setConfigInputKey(freshConfig.key);
+            fetchAllAuctionData(false);
+        };
+        window.addEventListener('supabase-credentials-changed', handleCredsChanged);
 
         // Real-time synchronization on all tables via Supabase WebSocket
         const subscription = supabase
@@ -166,17 +227,46 @@ function Auction() {
             clearTimeout(initTimer);
             clearInterval(pollInterval);
             window.removeEventListener('focus', handleVisibilityOrFocus);
+            window.removeEventListener('supabase-credentials-changed', handleCredsChanged);
             document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
             window.removeEventListener('storage', handleStorageChange);
             try { supabase.removeChannel(subscription); } catch {}
         };
     }, []);
 
-    const handleSaveSupabaseConfig = (e) => {
+    const handleTestConnection = async () => {
+        setIsTestingConn(true);
+        setTestResult(null);
+        try {
+            const res = await testSupabaseConnection(configInputUrl, configInputKey);
+            setTestResult(res);
+        } catch (err) {
+            setTestResult({
+                connected: false,
+                message: `Connection failed: ${err.message}`
+            });
+        } finally {
+            setIsTestingConn(false);
+        }
+    };
+
+    const handleSaveSupabaseConfig = async (e) => {
         e.preventDefault();
-        updateCustomSupabaseCredentials(configInputUrl, configInputKey);
-        setShowConfigModal(false);
-        setTimeout(() => fetchAllAuctionData(false), 200);
+        setIsSavingConn(true);
+        try {
+            await updateCustomSupabaseCredentials(configInputUrl, configInputKey);
+            setShowConfigModal(false);
+            setTestResult(null);
+            await fetchAllAuctionData(false);
+        } catch (err) {
+            console.error('Error saving credentials:', err);
+            setTestResult({
+                connected: false,
+                message: `Failed to save configuration: ${err.message}`
+            });
+        } finally {
+            setIsSavingConn(false);
+        }
     };
 
     const renderLeaderCard = (leader, roleTitle, roleIcon, bgColor) => {
@@ -333,6 +423,44 @@ function Auction() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* PROMINENT DATABASE NOT CONNECTED BANNER */}
+                        {!dbStatus.connected && (
+                            <div className="max-w-7xl mx-auto mb-10 p-6 md:p-8 bg-gradient-to-r from-orange-500/10 via-amber-500/15 to-orange-500/10 border-2 border-orange-500/30 rounded-3xl backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-14 h-14 rounded-2xl bg-orange-500 text-white flex items-center justify-center text-2xl shrink-0 shadow-sm shadow-orange-500/30">
+                                        <i className="fa-solid fa-database animate-pulse"></i>
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                            <h3 className="font-black text-gray-900 text-lg">
+                                                Auction Dashboard Is Not Connected To Supabase
+                                            </h3>
+                                            <span className="text-[10px] bg-red-100 text-red-700 font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                                                Database Disconnected
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-gray-600 max-w-2xl leading-relaxed font-medium">
+                                            {dbStatus.message || 'Please connect your Supabase database using your Project URL & Public Anon Key to view live franchise budgets, winning bids, and roster statistics.'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3 w-full md:w-auto shrink-0">
+                                    <button 
+                                        onClick={() => setShowConfigModal(true)} 
+                                        className="flex-1 md:flex-none px-6 py-3.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-black rounded-xl transition shadow-lg shadow-orange-500/30 cursor-pointer flex items-center justify-center gap-2"
+                                    >
+                                        <i className="fa-solid fa-plug"></i> Connect Database Now
+                                    </button>
+                                    <button 
+                                        onClick={() => setShowSqlGuide(true)} 
+                                        className="flex-1 md:flex-none px-5 py-3.5 bg-white hover:bg-gray-50 text-gray-800 text-xs font-bold rounded-xl border border-gray-200 transition cursor-pointer flex items-center justify-center gap-2 shadow-xs"
+                                    >
+                                        <i className="fa-solid fa-code text-orange-500"></i> View SQL Script
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         {isPageLoading ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
@@ -637,30 +765,53 @@ function Auction() {
                         <div className={`p-4 rounded-2xl mb-6 text-xs font-medium border ${dbStatus.connected ? 'bg-green-50 text-green-800 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
                             <div className="flex items-center gap-2 font-bold mb-1">
                                 <i className={`fa-solid ${dbStatus.connected ? 'fa-circle-check text-green-600' : 'fa-triangle-exclamation text-amber-600'}`}></i>
-                                <span>{dbStatus.connected ? 'Connected to Supabase' : 'Status: ' + dbStatus.message}</span>
+                                <span>{dbStatus.connected ? 'Database Status: Live Connected' : 'Database Status: Disconnected'}</span>
                             </div>
+                            <p className="text-gray-600 text-[11px] mt-0.5">{dbStatus.message}</p>
                             {dbStatus.connected && (
-                                <p className="text-green-700 text-[11px]">Real-time latency: {dbStatus.latency}ms</p>
+                                <p className="text-green-700 text-[11px] font-bold mt-1">Real-time latency: {dbStatus.latency}ms</p>
                             )}
                         </div>
+
+                        {/* TEST CONNECTION FEEDBACK */}
+                        {testResult && (
+                            <div className={`p-4 rounded-2xl mb-4 text-xs font-medium border ${testResult.connected ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'}`}>
+                                <div className="flex items-center gap-2 font-bold">
+                                    <i className={`fa-solid ${testResult.connected ? 'fa-circle-check text-emerald-600' : 'fa-circle-xmark text-red-600'}`}></i>
+                                    <span>{testResult.connected ? 'Test Succeeded!' : 'Connection Test Failed'}</span>
+                                </div>
+                                <p className="mt-1 text-[11px]">{testResult.message}</p>
+                                {testResult.errorType === 'MISSING_TABLES' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowConfigModal(false); setShowSqlGuide(true); }}
+                                        className="mt-2 px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded-lg text-[10px] flex items-center gap-1.5 cursor-pointer"
+                                    >
+                                        <i className="fa-solid fa-code"></i> Open SQL Script to Create Tables
+                                    </button>
+                                )}
+                            </div>
+                        )}
 
                         <form onSubmit={handleSaveSupabaseConfig} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                    Supabase Project URL
+                                    Supabase Project URL <span className="text-red-500">*</span>
                                 </label>
                                 <input
-                                    type="url"
+                                    type="text"
                                     placeholder="https://xyzcompany.supabase.co"
                                     value={configInputUrl}
                                     onChange={(e) => setConfigInputUrl(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-orange-500"
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-orange-500 font-medium"
+                                    required
                                 />
+                                <p className="text-[10px] text-gray-400 mt-1">Found in: Supabase Dashboard &rarr; Project Settings &rarr; API &rarr; Project URL</p>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
-                                    Supabase Anon Public API Key
+                                    Supabase Anon Public API Key <span className="text-red-500">*</span>
                                 </label>
                                 <textarea
                                     rows={3}
@@ -668,20 +819,289 @@ function Auction() {
                                     value={configInputKey}
                                     onChange={(e) => setConfigInputKey(e.target.value)}
                                     className="w-full px-4 py-3 rounded-xl border border-gray-200 text-xs font-mono focus:outline-none focus:border-orange-500"
+                                    required
                                 />
+                                <p className="text-[10px] text-gray-400 mt-1">Found in: Project Settings &rarr; API &rarr; Project API keys &rarr; <strong>anon public</strong></p>
                             </div>
 
-                            <div className="flex gap-3 pt-4">
-                                <button type="button" onClick={() => setShowConfigModal(false)}
-                                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm cursor-pointer">
-                                    Cancel
+                            <div className="pt-2 flex flex-col gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleTestConnection}
+                                    disabled={isTestingConn}
+                                    className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold rounded-xl text-xs transition cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    <i className={`fa-solid ${isTestingConn ? 'fa-spinner fa-spin' : 'fa-bolt text-orange-500'}`}></i>
+                                    {isTestingConn ? 'Testing Connection...' : 'Test Connection'}
                                 </button>
-                                <button type="submit"
-                                        className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm cursor-pointer shadow-md shadow-orange-500/20">
-                                    Save & Connect
-                                </button>
+                                
+                                <div className="flex gap-3">
+                                    <button 
+                                        type="button" 
+                                        onClick={() => setShowConfigModal(false)}
+                                        className="flex-1 py-3 bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold rounded-xl text-xs cursor-pointer border border-gray-200"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        disabled={isSavingConn}
+                                        className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs cursor-pointer shadow-md shadow-orange-500/20 flex items-center justify-center gap-1.5"
+                                    >
+                                        <i className={`fa-solid ${isSavingConn ? 'fa-spinner fa-spin' : 'fa-check'}`}></i>
+                                        {isSavingConn ? 'Saving & Connecting...' : 'Save & Connect'}
+                                    </button>
+                                </div>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* SQL SCRIPT GUIDE MODAL */}
+            {showSqlGuide && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
+                                    <i className="fa-solid fa-code"></i>
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-xl text-gray-900">Supabase SQL Setup</h3>
+                                    <p className="text-xs text-gray-400 font-bold">Run in Supabase &rarr; SQL Editor</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowSqlGuide(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                                <i className="fa-solid fa-xmark text-lg"></i>
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-500 mb-3">
+                            Execute this in your Supabase SQL Editor to initialize the <strong>players</strong>, <strong>team_bids</strong>, and <strong>teams</strong> tables, configure Row Level Security, and enable real-time updates:
+                        </p>
+
+                        <div className="flex-1 bg-gray-900 text-gray-100 p-4 rounded-2xl overflow-y-auto font-mono text-[11px] mb-4">
+                            <pre className="whitespace-pre-wrap">{`-- =========================================================
+-- 1. PLAYERS REGISTRY TABLE (Personal Details & Status)
+-- =========================================================
+create table if not exists players (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  gender text not null check (gender in ('M', 'F')),
+  year text,
+  section text,
+  sports text,
+  team text not null default 'UNSOLD',
+  role text not null default 'Player',
+  bid_amount numeric not null default 0 check (bid_amount >= 0),
+  photo_url text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_players_name on players using gin (to_tsvector('simple', name));
+create index if not exists idx_players_name_lower on players (lower(name));
+create index if not exists idx_players_team on players (lower(team));
+
+-- =========================================================
+-- 2. TEAM BIDS TABLE (Auction Draft & Bids)
+-- =========================================================
+create table if not exists team_bids (
+  id uuid default gen_random_uuid() primary key,
+  player_id uuid references players(id) on delete set null,
+  player_name text not null,
+  team text not null,
+  role text not null default 'Player',
+  bid_amount numeric not null default 0 check (bid_amount >= 0),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create unique index if not exists idx_unique_player_bid on team_bids (lower(player_name));
+create index if not exists idx_team_bids_team on team_bids (lower(team));
+
+-- =========================================================
+-- 3. TEAMS TABLE (Franchises, Purses, Leaders & Themes)
+-- =========================================================
+create table if not exists teams (
+  id uuid default gen_random_uuid() primary key,
+  name text not null unique,
+  total_purse numeric not null default 10000,
+  logo_url text,
+  color text default 'bg-orange-500',
+  text_color text default 'text-orange-500',
+  from_color text default 'from-orange-500',
+  captain_name text,
+  captain_gender text default 'M',
+  captain_initials text,
+  captain_color text default '#FF4500',
+  captain_photo text,
+  vice_captain_name text,
+  vice_captain_gender text default 'F',
+  vice_captain_initials text,
+  vice_captain_color text default '#2196F3',
+  vice_captain_photo text,
+  display_order integer default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_teams_display_order on teams (display_order);
+
+-- =========================================================
+-- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- =========================================================
+alter table players enable row level security;
+alter table team_bids enable row level security;
+alter table teams enable row level security;
+
+-- Public read policies
+create policy "Anyone can read players" on players for select using (true);
+create policy "Anyone can read team_bids" on team_bids for select using (true);
+create policy "Anyone can read teams" on teams for select using (true);
+
+-- Admin modification policies
+create policy "Public/Admin can insert players" on players for insert with check (true);
+create policy "Public/Admin can update players" on players for update using (true);
+create policy "Public/Admin can delete players" on players for delete using (true);
+
+create policy "Public/Admin can insert team_bids" on team_bids for insert with check (true);
+create policy "Public/Admin can update team_bids" on team_bids for update using (true);
+create policy "Public/Admin can delete team_bids" on team_bids for delete using (true);
+
+create policy "Public/Admin can insert teams" on teams for insert with check (true);
+create policy "Public/Admin can update teams" on teams for update using (true);
+create policy "Public/Admin can delete teams" on teams for delete using (true);
+
+-- =========================================================
+-- 5. INITIAL FRANCHISES SEED DATA
+-- =========================================================
+insert into teams (name, total_purse, logo_url, color, text_color, from_color, captain_name, captain_gender, captain_initials, captain_color, captain_photo, vice_captain_name, vice_captain_gender, vice_captain_initials, vice_captain_color, vice_captain_photo, display_order)
+values 
+  ('Team 1', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'SHRIYA YERANE', 'F', 'SY', '#2196F3', '', 1),
+  ('Team 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Mahek Malkan', 'F', 'MM', '#BA68C8', '', 2),
+  ('Team 3', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
+  ('Team 4', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
+  ('Team 5', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
+  ('Team 6', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '/manthan.png', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
+  ('Team 7', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
+  ('Team 8', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
+on conflict (name) do nothing;
+
+-- =========================================================
+-- 6. ENABLE REALTIME BROADCASTING
+-- =========================================================
+alter publication supabase_realtime add table players;
+alter publication supabase_realtime add table team_bids;
+alter publication supabase_realtime add table teams;`}</pre>
+                        </div>
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`create table if not exists players (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  gender text not null check (gender in ('M', 'F')),
+  year text,
+  section text,
+  sports text,
+  team text not null default 'UNSOLD',
+  role text not null default 'Player',
+  bid_amount numeric not null default 0 check (bid_amount >= 0),
+  photo_url text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_players_name on players using gin (to_tsvector('simple', name));
+create index if not exists idx_players_name_lower on players (lower(name));
+create index if not exists idx_players_team on players (lower(team));
+
+create table if not exists team_bids (
+  id uuid default gen_random_uuid() primary key,
+  player_id uuid references players(id) on delete set null,
+  player_name text not null,
+  team text not null,
+  role text not null default 'Player',
+  bid_amount numeric not null default 0 check (bid_amount >= 0),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create unique index if not exists idx_unique_player_bid on team_bids (lower(player_name));
+create index if not exists idx_team_bids_team on team_bids (lower(team));
+
+create table if not exists teams (
+  id uuid default gen_random_uuid() primary key,
+  name text not null unique,
+  total_purse numeric not null default 10000,
+  logo_url text,
+  color text default 'bg-orange-500',
+  text_color text default 'text-orange-500',
+  from_color text default 'from-orange-500',
+  captain_name text,
+  captain_gender text default 'M',
+  captain_initials text,
+  captain_color text default '#FF4500',
+  captain_photo text,
+  vice_captain_name text,
+  vice_captain_gender text default 'F',
+  vice_captain_initials text,
+  vice_captain_color text default '#2196F3',
+  vice_captain_photo text,
+  display_order integer default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_teams_display_order on teams (display_order);
+
+alter table players enable row level security;
+alter table team_bids enable row level security;
+alter table teams enable row level security;
+
+create policy "Anyone can read players" on players for select using (true);
+create policy "Anyone can read team_bids" on team_bids for select using (true);
+create policy "Anyone can read teams" on teams for select using (true);
+
+create policy "Public/Admin can insert players" on players for insert with check (true);
+create policy "Public/Admin can update players" on players for update using (true);
+create policy "Public/Admin can delete players" on players for delete using (true);
+
+create policy "Public/Admin can insert team_bids" on team_bids for insert with check (true);
+create policy "Public/Admin can update team_bids" on team_bids for update using (true);
+create policy "Public/Admin can delete team_bids" on team_bids for delete using (true);
+
+create policy "Public/Admin can insert teams" on teams for insert with check (true);
+create policy "Public/Admin can update teams" on teams for update using (true);
+create policy "Public/Admin can delete teams" on teams for delete using (true);
+
+insert into teams (name, total_purse, logo_url, color, text_color, from_color, captain_name, captain_gender, captain_initials, captain_color, captain_photo, vice_captain_name, vice_captain_gender, vice_captain_initials, vice_captain_color, vice_captain_photo, display_order)
+values 
+  ('Team 1', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'SHRIYA YERANE', 'F', 'SY', '#2196F3', '', 1),
+  ('Team 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Mahek Malkan', 'F', 'MM', '#BA68C8', '', 2),
+  ('Team 3', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
+  ('Team 4', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
+  ('Team 5', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
+  ('Team 6', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '/manthan.png', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
+  ('Team 7', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
+  ('Team 8', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
+on conflict (name) do nothing;
+
+alter publication supabase_realtime add table players;
+alter publication supabase_realtime add table team_bids;
+alter publication supabase_realtime add table teams;`);
+                                    setShowSqlGuide(false);
+                                }}
+                                className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 cursor-pointer shadow-sm"
+                            >
+                                <i className="fa-solid fa-copy"></i> Copy Script
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowSqlGuide(false)}
+                                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-xs cursor-pointer"
+                            >
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

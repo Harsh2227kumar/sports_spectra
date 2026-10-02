@@ -1,10 +1,36 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Read configuration from environment or browser configuration
-const getEnvOrStored = (envKey, storageKey) => {
+export const getCleanUrl = (rawUrl) => {
+  if (!rawUrl) return '';
+  let clean = rawUrl.trim().replace(/\/+$/, '');
+  // Clean /rest/v1 if user accidentally appended it
+  clean = clean.replace(/\/rest\/v1\/?$/, '');
+  
+  // If user only typed project ID (e.g. abcdefghijklmnop)
+  if (!clean.includes('.') && !clean.includes('://') && clean.length > 5) {
+    clean = `https://${clean}.supabase.co`;
+  } else if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+    clean = 'https://' + clean;
+  }
+  return clean;
+};
+
+// In-memory runtime override
+let runtimeConfig = {
+  url: '',
+  key: ''
+};
+
+// Read configuration from runtime, localStorage, or environment
+const getEnvOrStored = (envKey, storageKey, runtimeKey) => {
+  if (runtimeConfig[runtimeKey]) {
+    return runtimeConfig[runtimeKey];
+  }
   if (typeof window !== 'undefined') {
-    const stored = localStorage.getItem(storageKey);
-    if (stored && stored.trim()) return stored.trim();
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored && stored.trim()) return stored.trim();
+    } catch {}
   }
   const envVal = import.meta.env[envKey];
   if (envVal && typeof envVal === 'string' && envVal.trim()) return envVal.trim();
@@ -12,44 +38,63 @@ const getEnvOrStored = (envKey, storageKey) => {
 };
 
 export const getSupabaseConfig = () => {
-  const url = getEnvOrStored('VITE_SUPABASE_URL', 'sports_spectra_supabase_url');
-  const key = getEnvOrStored('VITE_SUPABASE_ANON_KEY', 'sports_spectra_supabase_anon_key');
+  let url = getEnvOrStored('VITE_SUPABASE_URL', 'sports_spectra_supabase_url', 'url');
+  let key = getEnvOrStored('VITE_SUPABASE_ANON_KEY', 'sports_spectra_supabase_anon_key', 'key');
+  url = getCleanUrl(url);
+  key = (key || '').trim();
+
   const valid = Boolean(
     url &&
     key &&
-    url.startsWith('http') &&
-    !url.includes('placeholder') &&
-    !url.includes('your-project')
+    (url.startsWith('http://') || url.startsWith('https://')) &&
+    !url.includes('your-project') &&
+    key.length > 15
   );
   return { url, key, isValid: valid };
 };
 
-// Immediate purge of all legacy fake/mock bids or fake players from prior tests
+// Fetch server-side .env credentials on startup if available
+if (typeof window !== 'undefined') {
+  fetch('/api/get-supabase-env')
+    .then(res => res.json())
+    .then(data => {
+      if (data?.url && data?.key) {
+        const storedUrl = localStorage.getItem('sports_spectra_supabase_url');
+        const storedKey = localStorage.getItem('sports_spectra_supabase_anon_key');
+        if (!storedUrl || !storedKey) {
+          runtimeConfig.url = getCleanUrl(data.url);
+          runtimeConfig.key = data.key.trim();
+          localStorage.setItem('sports_spectra_supabase_url', runtimeConfig.url);
+          localStorage.setItem('sports_spectra_supabase_anon_key', runtimeConfig.key);
+          reinitSupabaseClient();
+          window.dispatchEvent(new CustomEvent('supabase-credentials-changed'));
+        }
+      }
+    })
+    .catch(() => {});
+}
+
+// Clean old mock bids or test artifacts
 if (typeof window !== 'undefined') {
   try {
-    const staleKeys = ['team_bids', 'auctionPlayers', 'master_players'];
+    const staleKeys = ['auctionPlayers'];
     staleKeys.forEach(k => {
       const val = localStorage.getItem(k);
-      if (val && (val.includes('b1') || val.includes('2700') || val.includes('Rohan') || val.includes('7300') || val.includes('4 MEMBERS'))) {
+      if (val && (val.includes('b1') || val.includes('2700') || val.includes('7300'))) {
         localStorage.removeItem(k);
       }
     });
-
-    const teamsRaw = localStorage.getItem('franchise_teams');
-    if (teamsRaw && (teamsRaw.includes('"name":"Team 1"') || teamsRaw.includes('"name":"Team 3"'))) {
-      localStorage.removeItem('franchise_teams');
-    }
   } catch {}
 }
 
 export const INITIAL_SEED_PLAYERS = [];
 export const INITIAL_SEED_BIDS = [];
 
-// Default 8 franchise team structures (if teams table is not yet created in Supabase)
+// Official 8 franchise teams matching the user's tournament configuration
 export const DEFAULT_TEAMS_DATA = [
   {
     id: 'team-1',
-    name: 'ONE EIGHT CHALLENGERS',
+    name: 'Team 1',
     total_purse: 10000,
     logo_url: '/logo1.png',
     color: 'bg-orange-500',
@@ -60,7 +105,7 @@ export const DEFAULT_TEAMS_DATA = [
     captain_initials: 'AM',
     captain_color: '#D6CFCB',
     captain_photo: '',
-    vice_captain_name: 'Shriya Yerane',
+    vice_captain_name: 'SHRIYA YERANE',
     vice_captain_gender: 'F',
     vice_captain_initials: 'SY',
     vice_captain_color: '#2196F3',
@@ -69,7 +114,7 @@ export const DEFAULT_TEAMS_DATA = [
   },
   {
     id: 'team-2',
-    name: 'TEAM 2',
+    name: 'Team 2',
     total_purse: 10000,
     logo_url: '/logo2.png',
     color: 'bg-blue-600',
@@ -89,7 +134,7 @@ export const DEFAULT_TEAMS_DATA = [
   },
   {
     id: 'team-3',
-    name: 'ASTRA',
+    name: 'Team 3',
     total_purse: 10000,
     logo_url: '/logo3.png',
     color: 'bg-red-600',
@@ -109,7 +154,7 @@ export const DEFAULT_TEAMS_DATA = [
   },
   {
     id: 'team-4',
-    name: 'BRAVO',
+    name: 'Team 4',
     total_purse: 10000,
     logo_url: '/logo4.png',
     color: 'bg-purple-600',
@@ -129,7 +174,7 @@ export const DEFAULT_TEAMS_DATA = [
   },
   {
     id: 'team-5',
-    name: 'HELLFIRE',
+    name: 'Team 5',
     total_purse: 10000,
     logo_url: '/logo5.png',
     color: 'bg-green-600',
@@ -149,7 +194,7 @@ export const DEFAULT_TEAMS_DATA = [
   },
   {
     id: 'team-6',
-    name: 'AUREX',
+    name: 'Team 6',
     total_purse: 10000,
     logo_url: '/logo6.png',
     color: 'bg-yellow-600',
@@ -169,13 +214,13 @@ export const DEFAULT_TEAMS_DATA = [
   },
   {
     id: 'team-7',
-    name: 'TITANS',
+    name: 'Team 7',
     total_purse: 10000,
     logo_url: '/logo7.png',
     color: 'bg-pink-600',
     text_color: 'text-pink-600',
     from_color: 'from-pink-600',
-    captain_name: 'Parth Tiwaskar',
+    captain_name: 'Parth tiwaskar',
     captain_gender: 'M',
     captain_initials: 'PT',
     captain_color: '#A1887F',
@@ -189,7 +234,7 @@ export const DEFAULT_TEAMS_DATA = [
   },
   {
     id: 'team-8',
-    name: 'NEMESIS',
+    name: 'Team 8',
     total_purse: 10000,
     logo_url: '/logo8.png',
     color: 'bg-cyan-600',
@@ -225,7 +270,7 @@ export function saveLocalPlayersRegistry(players) {
     localStorage.setItem('master_players', JSON.stringify(players));
     window.dispatchEvent(new Event('storage'));
   } catch (err) {
-    console.warn('[AI Studio] Local storage save failed:', err);
+    console.warn('[Sports Spectra] Local storage save failed:', err);
   }
 }
 
@@ -245,7 +290,7 @@ export function saveLocalTeamBids(bids) {
     localStorage.setItem('team_bids', JSON.stringify(bids));
     window.dispatchEvent(new Event('storage'));
   } catch (err) {
-    console.warn('[AI Studio] Local bids save failed:', err);
+    console.warn('[Sports Spectra] Local bids save failed:', err);
   }
 }
 
@@ -257,7 +302,12 @@ export function getLocalTeams() {
       localStorage.setItem('franchise_teams', JSON.stringify(DEFAULT_TEAMS_DATA));
       return DEFAULT_TEAMS_DATA;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem('franchise_teams', JSON.stringify(DEFAULT_TEAMS_DATA));
+      return DEFAULT_TEAMS_DATA;
+    }
+    return parsed;
   } catch {
     return DEFAULT_TEAMS_DATA;
   }
@@ -269,190 +319,167 @@ export function saveLocalTeams(teams) {
     localStorage.setItem('franchise_teams', JSON.stringify(teams));
     window.dispatchEvent(new Event('storage'));
   } catch (err) {
-    console.warn('[AI Studio] Local teams save failed:', err);
+    console.warn('[Sports Spectra] Local teams save failed:', err);
   }
 }
 
-// In-memory Mock fallback (only used if Supabase credentials are not provided)
-const createMockSupabase = () => {
+// Fallback client when offline or awaiting configuration
+function createMockSupabase() {
   const channelCallbacks = new Set();
 
   return {
+    isMock: true,
     from(tableName) {
       return {
-        select: (_cols = '*') => {
-          let currentData = [];
-          if (tableName === 'team_bids') {
-            currentData = getLocalTeamBids();
-          } else if (tableName === 'teams') {
-            currentData = getLocalTeams();
-          } else {
-            currentData = getLocalPlayersRegistry();
-          }
-
-          const queryObj = {
-            order: (col, opts = {}) => {
-              const asc = opts.ascending !== false;
-              const sorted = [...currentData].sort((a, b) => {
-                const va = a[col] ?? 0;
-                const vb = b[col] ?? 0;
-                if (va < vb) return asc ? -1 : 1;
-                if (va > vb) return asc ? 1 : -1;
-                return 0;
-              });
-              return Promise.resolve({ data: sorted, error: null });
+        select(_columns = '*', _options = {}) {
+          return {
+            order(_col, _opts) {
+              return this;
             },
-            limit: (count) => {
-              return Promise.resolve({ data: currentData.slice(0, count), error: null });
+            limit(_n) {
+              return this;
             },
-            then: (resolve, reject) => {
-              return Promise.resolve({ data: currentData, error: null }).then(resolve, reject);
+            then(resolve) {
+              if (tableName === 'team_bids') {
+                const bids = getLocalTeamBids();
+                resolve({ data: bids, error: null });
+              } else if (tableName === 'teams') {
+                const teams = getLocalTeams();
+                resolve({ data: teams, error: null });
+              } else {
+                const players = getLocalPlayersRegistry();
+                resolve({ data: players, error: null });
+              }
             }
           };
-          return queryObj;
         },
-        insert: async (rows) => {
-          const itemsToInsert = Array.isArray(rows) ? rows : [rows];
-          if (tableName === 'team_bids') {
-            const current = getLocalTeamBids();
-            const newBids = itemsToInsert.map((row, idx) => ({
-              id: row.id || `bid_${Date.now()}_${idx}`,
-              player_id: row.player_id || null,
-              player_name: row.player_name,
-              team: row.team,
-              role: row.role || 'Player',
-              bid_amount: Number(row.bid_amount || 0),
-              created_at: new Date().toISOString()
-            }));
-            const updated = [...current, ...newBids];
-            saveLocalTeamBids(updated);
-            channelCallbacks.forEach(cb => {
-              try { cb({ event: 'INSERT', new: newBids }); } catch {}
-            });
-            return { data: newBids, error: null };
-          } else if (tableName === 'teams') {
-            const current = getLocalTeams();
-            const newTeams = itemsToInsert.map((row, idx) => ({
-              id: row.id || `team_${Date.now()}_${idx}`,
-              name: row.name,
-              total_purse: Number(row.total_purse || 10000),
-              logo_url: row.logo_url || '/logo1.png',
-              color: row.color || 'bg-orange-500',
-              text_color: row.text_color || 'text-orange-500',
-              from_color: row.from_color || 'from-orange-500',
-              captain_name: row.captain_name || '',
-              captain_gender: row.captain_gender || 'M',
-              captain_initials: row.captain_initials || '',
-              captain_color: row.captain_color || '#D6CFCB',
-              captain_photo: row.captain_photo || '',
-              vice_captain_name: row.vice_captain_name || '',
-              vice_captain_gender: row.vice_captain_gender || 'F',
-              vice_captain_initials: row.vice_captain_initials || '',
-              vice_captain_color: row.vice_captain_color || '#2196F3',
-              vice_captain_photo: row.vice_captain_photo || '',
-              display_order: row.display_order ?? (current.length + idx + 1),
-              created_at: new Date().toISOString()
-            }));
-            const updated = [...current, ...newTeams];
-            saveLocalTeams(updated);
-            channelCallbacks.forEach(cb => {
-              try { cb({ event: 'INSERT', new: newTeams }); } catch {}
-            });
-            return { data: newTeams, error: null };
-          } else {
-            const current = getLocalPlayersRegistry();
-            const newPlayers = itemsToInsert.map((row, idx) => ({
-              id: row.id || `p_${Date.now()}_${idx}`,
-              name: row.name,
-              gender: row.gender || 'M',
-              year: row.year || '',
-              section: row.section || '',
-              sports: row.sports || '',
-              team: row.team || 'UNSOLD',
-              role: row.role || 'Player',
-              bid_amount: Number(row.bid_amount || 0),
-              photo_url: row.photo_url || '',
-              created_at: new Date().toISOString()
-            }));
-            const updated = [...current, ...newPlayers];
-            saveLocalPlayersRegistry(updated);
-            channelCallbacks.forEach(cb => {
-              try { cb({ event: 'INSERT', new: newPlayers }); } catch {}
-            });
-            return { data: newPlayers, error: null };
-          }
-        },
-        update(patch) {
+        insert(records) {
+          const arr = Array.isArray(records) ? records : [records];
           return {
-            eq: async (column, value) => {
+            select() {
+              return this;
+            },
+            then(resolve) {
               if (tableName === 'team_bids') {
                 const current = getLocalTeamBids();
-                const updated = current.map(item => {
-                  if (String(item[column] || '').toLowerCase() === String(value).toLowerCase()) {
-                    return { ...item, ...patch };
-                  }
-                  return item;
-                });
+                const newRecords = arr.map(r => ({
+                  id: r.id || 'bid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                  player_id: r.player_id,
+                  player_name: r.player_name,
+                  team: r.team,
+                  role: r.role || 'Player',
+                  bid_amount: Number(r.bid_amount || 0),
+                  created_at: new Date().toISOString()
+                }));
+                const updated = [...current, ...newRecords];
                 saveLocalTeamBids(updated);
                 channelCallbacks.forEach(cb => {
-                  try { cb({ event: 'UPDATE' }); } catch {}
+                  try { cb({ event: 'INSERT', new: newRecords[0] }); } catch {}
                 });
-                return { data: patch, error: null };
+                resolve({ data: newRecords, error: null });
               } else if (tableName === 'teams') {
                 const current = getLocalTeams();
-                const updated = current.map(item => {
-                  if (String(item[column] || '').toLowerCase() === String(value).toLowerCase()) {
-                    return { ...item, ...patch };
-                  }
-                  return item;
-                });
+                const updated = [...current, ...arr];
                 saveLocalTeams(updated);
-                channelCallbacks.forEach(cb => {
-                  try { cb({ event: 'UPDATE' }); } catch {}
-                });
-                return { data: patch, error: null };
+                resolve({ data: arr, error: null });
               } else {
                 const current = getLocalPlayersRegistry();
-                const updated = current.map(item => {
-                  if (String(item[column] || '').toLowerCase() === String(value).toLowerCase()) {
-                    return { ...item, ...patch };
-                  }
-                  return item;
-                });
+                const newRecords = arr.map(r => ({
+                  id: r.id || 'p-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                  name: r.name,
+                  gender: r.gender || 'M',
+                  year: r.year || '',
+                  section: r.section || '',
+                  sports: r.sports || '',
+                  team: r.team || 'UNSOLD',
+                  role: r.role || 'Player',
+                  bid_amount: Number(r.bid_amount || 0),
+                  photo_url: r.photo_url || r.photoUrl || '',
+                  created_at: new Date().toISOString()
+                }));
+                const updated = [...current, ...newRecords];
                 saveLocalPlayersRegistry(updated);
                 channelCallbacks.forEach(cb => {
-                  try { cb({ event: 'UPDATE' }); } catch {}
+                  try { cb({ event: 'INSERT', new: newRecords[0] }); } catch {}
                 });
-                return { data: patch, error: null };
+                resolve({ data: newRecords, error: null });
               }
+            }
+          };
+        },
+        upsert(records) {
+          return this.insert(records);
+        },
+        update(updates) {
+          return {
+            eq(column, value) {
+              return {
+                then(resolve) {
+                  if (tableName === 'team_bids') {
+                    const current = getLocalTeamBids();
+                    const updated = current.map(item => {
+                      if (String(item[column] || '').toLowerCase() === String(value).toLowerCase()) {
+                        return { ...item, ...updates };
+                      }
+                      return item;
+                    });
+                    saveLocalTeamBids(updated);
+                    resolve({ data: updated, error: null });
+                  } else if (tableName === 'teams') {
+                    const current = getLocalTeams();
+                    const updated = current.map(item => {
+                      if (String(item[column] || '').toLowerCase() === String(value).toLowerCase()) {
+                        return { ...item, ...updates };
+                      }
+                      return item;
+                    });
+                    saveLocalTeams(updated);
+                    resolve({ data: updated, error: null });
+                  } else {
+                    const current = getLocalPlayersRegistry();
+                    const updated = current.map(item => {
+                      if (String(item[column] || '').toLowerCase() === String(value).toLowerCase()) {
+                        return { ...item, ...updates };
+                      }
+                      return item;
+                    });
+                    saveLocalPlayersRegistry(updated);
+                    resolve({ data: updated, error: null });
+                  }
+                }
+              };
             }
           };
         },
         delete() {
           return {
-            eq: async (column, value) => {
-              if (tableName === 'team_bids') {
-                const current = getLocalTeamBids();
-                const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
-                saveLocalTeamBids(updated);
-                channelCallbacks.forEach(cb => {
-                  try { cb({ event: 'DELETE' }); } catch {}
-                });
-                return { data: null, error: null };
-              } else if (tableName === 'teams') {
-                const current = getLocalTeams();
-                const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
-                saveLocalTeams(updated);
-                return { data: null, error: null };
-              } else {
-                const current = getLocalPlayersRegistry();
-                const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
-                saveLocalPlayersRegistry(updated);
-                channelCallbacks.forEach(cb => {
-                  try { cb({ event: 'DELETE' }); } catch {}
-                });
-                return { data: null, error: null };
-              }
+            eq(column, value) {
+              return {
+                then(resolve) {
+                  if (tableName === 'team_bids') {
+                    const current = getLocalTeamBids();
+                    const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
+                    saveLocalTeamBids(updated);
+                    channelCallbacks.forEach(cb => {
+                      try { cb({ event: 'DELETE' }); } catch {}
+                    });
+                    resolve({ data: null, error: null });
+                  } else if (tableName === 'teams') {
+                    const current = getLocalTeams();
+                    const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
+                    saveLocalTeams(updated);
+                    resolve({ data: null, error: null });
+                  } else {
+                    const current = getLocalPlayersRegistry();
+                    const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
+                    saveLocalPlayersRegistry(updated);
+                    channelCallbacks.forEach(cb => {
+                      try { cb({ event: 'DELETE' }); } catch {}
+                    });
+                    resolve({ data: null, error: null });
+                  }
+                }
+              };
             }
           };
         }
@@ -478,48 +505,175 @@ const createMockSupabase = () => {
       // no-op
     }
   };
-};
+}
 
-let currentClientInstance = null;
+let activeClientInstance = null;
 
-export const initSupabaseClient = () => {
+export const reinitSupabaseClient = () => {
   const { url, key, isValid } = getSupabaseConfig();
   if (isValid) {
     try {
-      currentClientInstance = createClient(url, key, {
+      activeClientInstance = createClient(url, key, {
         auth: { persistSession: false },
         realtime: { params: { eventsPerSecond: 20 } }
       });
-      return currentClientInstance;
+      activeClientInstance.isMock = false;
+      return activeClientInstance;
     } catch (err) {
-      console.warn('[AI Studio] Supabase createClient failed, falling back:', err);
+      console.warn('[Sports Spectra] Supabase createClient error:', err);
     }
   }
-  currentClientInstance = createMockSupabase();
-  return currentClientInstance;
+  activeClientInstance = createMockSupabase();
+  return activeClientInstance;
 };
 
-export let supabase = initSupabaseClient();
-export const isConfigured = getSupabaseConfig().isValid;
+// Singleton getter
+export const getActiveSupabaseClient = () => {
+  if (!activeClientInstance) {
+    reinitSupabaseClient();
+  }
+  return activeClientInstance;
+};
 
-export function updateCustomSupabaseCredentials(url, key) {
+// Export dynamic proxy so all imports automatically use the active client without reloading
+export const supabase = new Proxy({}, {
+  get(_target, prop) {
+    const client = getActiveSupabaseClient();
+    const val = client[prop];
+    if (typeof val === 'function') {
+      return val.bind(client);
+    }
+    return val;
+  }
+});
+
+export const isConfigured = () => getSupabaseConfig().isValid;
+
+/**
+ * Test a Supabase connection with credentials before saving
+ */
+export async function testSupabaseConnection(testUrl, testKey) {
+  const cleanUrl = getCleanUrl(testUrl);
+  const cleanKey = (testKey || '').trim();
+
+  if (!cleanUrl || !cleanKey) {
+    return {
+      connected: false,
+      message: 'Both Supabase Project URL and Anon API Key are required.'
+    };
+  }
+
+  const start = performance.now();
+  try {
+    const tempClient = createClient(cleanUrl, cleanKey, {
+      auth: { persistSession: false }
+    });
+
+    // Check tables: teams, players, and team_bids
+    const [teamsTest, playersTest, bidsTest] = await Promise.all([
+      tempClient.from('teams').select('id, name').limit(5),
+      tempClient.from('players').select('id, name').limit(1),
+      tempClient.from('team_bids').select('id').limit(1)
+    ]);
+
+    const latency = Math.max(1, Math.round(performance.now() - start));
+
+    // Check for authorization or invalid key error
+    const authError = [teamsTest.error, playersTest.error, bidsTest.error].find(e => 
+      e && (e.code === 'PGRST301' || e.message?.includes('JWT') || e.message?.includes('apikey') || e.code === '401' || e.code === '403')
+    );
+    if (authError) {
+      return {
+        connected: false,
+        latency,
+        errorType: 'AUTH_ERROR',
+        message: 'Invalid Anon API Key. Please verify the "anon public" key from your Supabase Project Settings -> API.'
+      };
+    }
+
+    // Check if tables are missing
+    const missingTables = [];
+    if (teamsTest.error?.message?.includes('does not exist') || teamsTest.error?.message?.includes('relation')) {
+      missingTables.push('teams');
+    }
+    if (playersTest.error?.message?.includes('does not exist') || playersTest.error?.message?.includes('relation')) {
+      missingTables.push('players');
+    }
+    if (bidsTest.error?.message?.includes('does not exist') || bidsTest.error?.message?.includes('relation')) {
+      missingTables.push('team_bids');
+    }
+
+    if (missingTables.length > 0) {
+      return {
+        connected: true,
+        latency,
+        hasMissingTables: true,
+        missingTables,
+        message: `Connected to Supabase in ${latency}ms! Table(s) [${missingTables.join(', ')}] not created yet. Run the SQL script in SQL Editor.`
+      };
+    }
+
+    const teamCount = teamsTest.data?.length || 0;
+    return {
+      connected: true,
+      latency,
+      hasMissingTables: false,
+      teamCount,
+      message: `Successfully connected to Supabase in ${latency}ms! Verified teams (${teamCount}), players, and bids tables.`
+    };
+  } catch (err) {
+    const latency = Math.round(performance.now() - start);
+    return {
+      connected: false,
+      latency,
+      errorType: 'NETWORK_ERROR',
+      message: `Could not reach ${cleanUrl}: ${err.message}. Please check your internet connection and verify the Project URL.`
+    };
+  }
+}
+
+export async function updateCustomSupabaseCredentials(url, key) {
+  const cleanUrl = getCleanUrl(url);
+  const cleanKey = (key || '').trim();
+
+  runtimeConfig.url = cleanUrl;
+  runtimeConfig.key = cleanKey;
+
   if (typeof window !== 'undefined') {
-    if (url) localStorage.setItem('sports_spectra_supabase_url', url.trim());
+    if (cleanUrl) localStorage.setItem('sports_spectra_supabase_url', cleanUrl);
     else localStorage.removeItem('sports_spectra_supabase_url');
 
-    if (key) localStorage.setItem('sports_spectra_supabase_anon_key', key.trim());
+    if (cleanKey) localStorage.setItem('sports_spectra_supabase_anon_key', cleanKey);
     else localStorage.removeItem('sports_spectra_supabase_anon_key');
-
-    supabase = initSupabaseClient();
-    window.dispatchEvent(new Event('storage'));
   }
+
+  // Persist to server .env
+  try {
+    await fetch('/api/save-supabase-env', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: cleanUrl, key: cleanKey })
+    });
+  } catch {}
+
+  // Re-instantiate active client immediately
+  reinitSupabaseClient();
+
+  // Notify all listening components in the app
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('supabase-credentials-changed', {
+      detail: { url: cleanUrl, key: cleanKey }
+    }));
+  }
+
+  return { success: true };
 }
 
 /**
  * Checks connection health to Supabase
  */
 export async function checkDatabaseConnection() {
-  const { url, isValid } = getSupabaseConfig();
+  const { url, key, isValid } = getSupabaseConfig();
   if (!isValid) {
     return {
       connected: false,
@@ -530,56 +684,5 @@ export async function checkDatabaseConnection() {
     };
   }
 
-  const start = performance.now();
-  try {
-    const { error: playersErr } = await supabase.from('players').select('id').limit(1);
-    const latency = Math.round(performance.now() - start);
-
-    if (playersErr) {
-      return {
-        connected: false,
-        isMock: false,
-        latency,
-        error: playersErr.message,
-        supabaseUrl: url.replace(/(https:\/\/)([^.]+)/, '$1***'),
-        message: `Connected to Supabase, but "players" table error: ${playersErr.message}`
-      };
-    }
-
-    let hasTeamBids = true;
-    let hasTeams = true;
-    try {
-      const { error: bidErr } = await supabase.from('team_bids').select('id').limit(1);
-      if (bidErr) hasTeamBids = false;
-    } catch {
-      hasTeamBids = false;
-    }
-
-    try {
-      const { error: teamErr } = await supabase.from('teams').select('id').limit(1);
-      if (teamErr) hasTeams = false;
-    } catch {
-      hasTeams = false;
-    }
-
-    return {
-      connected: true,
-      isMock: false,
-      latency,
-      hasTeamBidsTable: hasTeamBids,
-      hasTeamsTable: hasTeams,
-      supabaseUrl: url.replace(/(https:\/\/)([^.]+)/, '$1***'),
-      message: 'Active & Connected to Supabase PostgreSQL'
-    };
-  } catch (err) {
-    const latency = Math.round(performance.now() - start);
-    return {
-      connected: false,
-      isMock: false,
-      latency,
-      error: err.message,
-      supabaseUrl: url ? url.replace(/(https:\/\/)([^.]+)/, '$1***') : null,
-      message: `Connection failed: ${err.message}`
-    };
-  }
+  return await testSupabaseConnection(url, key);
 }

@@ -6,7 +6,6 @@ import {
   getLocalTeamBids, 
   getLocalTeams,
   saveLocalTeams,
-  checkDatabaseConnection,
   getSupabaseConfig,
   updateCustomSupabaseCredentials
 } from '../supabaseClient';
@@ -54,7 +53,7 @@ function Admin() {
 
     // Form state (Only bidding data and team selection; personal details are fetched from DB)
     const [formData, setFormData] = useState(() => ({
-        team: getLocalTeams()[0]?.name || 'ONE EIGHT CHALLENGERS',
+        team: getLocalTeams()[0]?.name || 'Team 1',
         role: 'Player',
         playerName: '',
         bidAmount: ''
@@ -76,14 +75,44 @@ function Admin() {
 
     // Fetch master players and team bids directly from database
     const loadData = async () => {
+        const startTime = performance.now();
         try {
-            const status = await checkDatabaseConnection();
-            setDbStatus(status);
-
             // 1. Fetch Master Players (Personal details)
-            const { data: dbPlayers, error: pErr } = await supabase.from('players').select('*');
-            if (!pErr && dbPlayers) {
-                const mappedPlayers = dbPlayers.map(p => ({
+            const [playersRes, bidsRes, teamsRes] = await Promise.all([
+                supabase.from('players').select('*'),
+                supabase.from('team_bids').select('*'),
+                supabase.from('teams').select('*').order('display_order')
+            ]);
+
+            const latency = Math.max(1, Math.round(performance.now() - startTime));
+
+            const config = getSupabaseConfig();
+            if (!config.isValid) {
+                setDbStatus({
+                    connected: false,
+                    isMock: true,
+                    latency: 0,
+                    message: 'Database not connected. Configure Supabase credentials to sync.'
+                });
+            } else {
+                const anyError = playersRes.error || bidsRes.error || teamsRes.error;
+                if (anyError) {
+                    setDbStatus({
+                        connected: false,
+                        latency,
+                        message: anyError.message
+                    });
+                } else {
+                    setDbStatus({
+                        connected: true,
+                        latency,
+                        message: `Supabase Live (${latency}ms)`
+                    });
+                }
+            }
+
+            if (!playersRes.error && playersRes.data) {
+                const mappedPlayers = playersRes.data.map(p => ({
                     id: p.id,
                     name: p.name,
                     gender: p.gender || 'M',
@@ -96,9 +125,8 @@ function Admin() {
             }
 
             // 2. Fetch Team Bids (Separate table) - NEVER FALL BACK TO MOCK BIDS IF DB RETURNS 0
-            const { data: dbBids, error: bErr } = await supabase.from('team_bids').select('*');
-            if (!bErr && dbBids) {
-                const mappedBids = dbBids.map(b => ({
+            if (!bidsRes.error && bidsRes.data) {
+                const mappedBids = bidsRes.data.map(b => ({
                     id: b.id,
                     playerId: b.player_id,
                     playerName: b.player_name,
@@ -110,10 +138,9 @@ function Admin() {
             }
 
             // 3. Fetch Franchises / Teams from database
-            const { data: dbTeams, error: tErr } = await supabase.from('teams').select('*').order('display_order');
-            if (!tErr && dbTeams && dbTeams.length > 0) {
-                setTeamsList(dbTeams);
-                saveLocalTeams(dbTeams);
+            if (!teamsRes.error && teamsRes.data && teamsRes.data.length > 0) {
+                setTeamsList(teamsRes.data);
+                saveLocalTeams(teamsRes.data);
             }
         } catch (err) {
             console.warn('[Sports Spectra] Error loading admin database data:', err);
@@ -132,7 +159,15 @@ function Admin() {
         // High frequency poll for instant live updates
         const poll = setInterval(() => {
             if (isAuthenticated) loadData();
-        }, 2000);
+        }, 2500);
+
+        const handleCredsChanged = () => {
+            const fresh = getSupabaseConfig();
+            setConfigInputUrl(fresh.url);
+            setConfigInputKey(fresh.key);
+            if (isAuthenticated) loadData();
+        };
+        window.addEventListener('supabase-credentials-changed', handleCredsChanged);
 
         // Realtime channels
         const sub = supabase
@@ -147,6 +182,7 @@ function Admin() {
             isCancelled = true;
             clearInterval(poll);
             window.removeEventListener('storage', loadData);
+            window.removeEventListener('supabase-credentials-changed', handleCredsChanged);
             try { supabase.removeChannel(sub); } catch {}
         };
     }, [isAuthenticated]);
