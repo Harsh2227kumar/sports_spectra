@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { ADMIN_IMPORT } from '../utils/paths';
 import { 
   supabase, 
   getLocalPlayersRegistry, 
@@ -502,7 +503,7 @@ function Admin() {
                             <span className={`w-2 h-2 rounded-full ${dbStatus.connected ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`}></span>
                             <span className="hidden xs:inline">DB:</span> {dbStatus.connected ? `${dbStatus.latency}ms` : 'Disconnected'}
                         </button>
-                        <Link to="/doremon/import-export" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
+                        <Link to={ADMIN_IMPORT} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
                             <i className="fa-solid fa-file-import text-orange-500"></i> <span className="hidden xs:inline">Import /</span> Export
                         </Link>
                         <Link to="/auction" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-orange-500 text-white hover:bg-orange-600 transition flex items-center gap-1.5 sm:gap-2 shadow-xs">
@@ -660,7 +661,7 @@ function Admin() {
                                                 </div>
                                             </div>
                                         </div>
-                                        <Link to="/doremon/import-export" className="text-[11px] font-bold text-orange-600 hover:text-orange-700 underline shrink-0">
+                                        <Link to={ADMIN_IMPORT} className="text-[11px] font-bold text-orange-600 hover:text-orange-700 underline shrink-0">
                                             Edit Details
                                         </Link>
                                     </div>

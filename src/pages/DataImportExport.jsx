@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
+import { ADMIN_BASE } from '../utils/paths';
 import { 
   supabase, 
   checkDatabaseConnection, 
@@ -570,7 +571,7 @@ export default function DataImportExport() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full sm:w-auto">
-            <Link to="/doremon" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
+            <Link to={ADMIN_BASE} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
               <i className="fa-solid fa-gavel text-orange-500"></i> Bidding Desk
             </Link>
             <Link to="/auction" className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-1.5 sm:gap-2">
