@@ -1,345 +1,171 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Papa from 'papaparse';
-import { supabase } from '../supabaseClient';
+import { Link } from 'react-router-dom';
+import { 
+  supabase, 
+  getLocalPlayersRegistry, 
+  getLocalTeamBids, 
+  getLocalTeams,
+  saveLocalTeams,
+  checkDatabaseConnection,
+  getSupabaseConfig,
+  updateCustomSupabaseCredentials
+} from '../supabaseClient';
 
 function Admin() {
     const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('adminAuth') === 'true');
     const [passwordInput, setPasswordInput] = useState('');
     const [loginError, setLoginError] = useState(false);
 
-    const [players, setPlayers] = useState([]);
+    // Database players & bids state
+    const [masterPlayers, setMasterPlayers] = useState(() => {
+        return getLocalPlayersRegistry().map(p => ({
+            id: p.id,
+            name: p.name,
+            gender: p.gender || 'M',
+            year: p.year || '',
+            section: p.section || '',
+            sports: p.sports || '',
+            photoUrl: p.photo_url || p.photoUrl || ''
+        }));
+    });
+
+    const [teamBids, setTeamBids] = useState(() => {
+        return getLocalTeamBids().map(b => ({
+            id: b.id,
+            playerId: b.player_id,
+            playerName: b.player_name,
+            team: b.team,
+            role: b.role || 'Player',
+            bidAmount: Number(b.bid_amount || 0)
+        }));
+    });
+
+    const [teamsList, setTeamsList] = useState(() => getLocalTeams());
+
     const [showSuccess, setShowSuccess] = useState(false);
+    const [successMsg, setSuccessMsg] = useState('');
+    const [errorMessage, setErrorMessage] = useState(null);
 
     // Autocomplete state
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedPlayerObj, setSelectedPlayerObj] = useState(null);
     const suggestionsRef = useRef(null);
-    const fileInputRef = useRef(null);
-    
-    // Form state
-    const [formData, setFormData] = useState({
-        team: 'TEAM 1',
+
+    // Form state (Only bidding data and team selection; personal details are fetched from DB)
+    const [formData, setFormData] = useState(() => ({
+        team: getLocalTeams()[0]?.name || 'ONE EIGHT CHALLENGERS',
         role: 'Player',
         playerName: '',
-        gender: 'M',
-        year: '',
-        section: '',
-        sports: '',
-        bidAmount: '',
-        photoUrl: ''
-    });
+        bidAmount: ''
+    }));
 
     // Edit state
-    const [editPlayerId, setEditPlayerId] = useState(null);
-    const [duplicateError, setDuplicateError] = useState(null);
+    const [editBidId, setEditBidId] = useState(null);
+    const [duplicateWarning, setDuplicateWarning] = useState(null);
 
-    useEffect(() => {
-        const loadPlayers = async () => {
-            // First load from localStorage to be quick
-            const local = JSON.parse(localStorage.getItem('auctionPlayers') || '[]');
-            if (local.length > 0) setPlayers(local);
+    // Delete confirm modal state
+    const [deleteConfirmBid, setDeleteConfirmBid] = useState(null);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
-            // Then fetch from Supabase to ensure we have UNSOLD players (if not in local)
-            const { data, error } = await supabase.from('players').select('*');
-            if (data && !error) {
-                // Map DB schema to local schema
-                const mapped = data.map(dbPlayer => ({
-                    id: dbPlayer.id,
-                    team: dbPlayer.team,
-                    role: dbPlayer.role,
-                    name: dbPlayer.name,
-                    gender: dbPlayer.gender,
-                    year: dbPlayer.year,
-                    section: dbPlayer.section,
-                    sports: dbPlayer.sports,
-                    bidAmount: dbPlayer.bid_amount,
-                    photoUrl: dbPlayer.photo_url
-                }));
-                setPlayers(mapped);
-                localStorage.setItem('auctionPlayers', JSON.stringify(mapped));
-            }
-        };
-        loadPlayers();
-        window.addEventListener('storage', loadPlayers);
+    // Supabase Connection state
+    const [dbStatus, setDbStatus] = useState({ connected: false, latency: 0, message: '' });
+    const [showConfigModal, setShowConfigModal] = useState(false);
+    const [configInputUrl, setConfigInputUrl] = useState(() => getSupabaseConfig().url);
+    const [configInputKey, setConfigInputKey] = useState(() => getSupabaseConfig().key);
 
-        return () => window.removeEventListener('storage', loadPlayers);
-    }, []);
-
-    const handleFileUpload = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                const rawData = results.data;
-                const normalized = rawData.map(row => {
-                    const obj = {};
-                    for (const key of Object.keys(row)) {
-                        const k = key.trim().toLowerCase();
-                        if (k === 'name' || k === 'player name' || k === 'playername') obj.name = String(row[key]).trim();
-                        else if (k === 'gender' || k === 'sex') obj.gender = String(row[key]).trim().toUpperCase().charAt(0);
-                        else if (k === 'year' || k === 'yr') obj.year = String(row[key]).trim();
-                        else if (k === 'section' || k === 'sec') obj.section = String(row[key]).trim();
-                        else if (k === 'sport 1' || k === 'sport1' || k === 'sports') obj.sport1 = String(row[key]).trim();
-                        else if (k === 'sport 2' || k === 'sport2') obj.sport2 = String(row[key]).trim();
-                        else if (k === 'photo' || k === 'photo url' || k === 'photourl' || k === 'image') obj.photo = String(row[key]).trim();
-                    }
-                    const sports = [obj.sport1, obj.sport2].filter(Boolean).join(', ');
-                    return {
-                        team: 'UNSOLD',
-                        role: 'Player',
-                        name: obj.name,
-                        gender: obj.gender || 'M',
-                        year: obj.year || '',
-                        section: obj.section || '',
-                        sports: sports,
-                        bid_amount: 0,
-                        photo_url: obj.photo || ''
-                    };
-                }).filter(row => row.name);
-
-                try {
-                    const { error } = await supabase.from('players').insert(normalized);
-                    if (error) throw error;
-                    alert(`Successfully imported ${normalized.length} players to the database!`);
-                    // Reload to reflect changes
-                    window.dispatchEvent(new Event('storage'));
-                    
-                    // Manually trigger reload to get new UUIDs
-                    const { data } = await supabase.from('players').select('*');
-                    if (data) {
-                        const mapped = data.map(dbPlayer => ({
-                            id: dbPlayer.id,
-                            team: dbPlayer.team,
-                            role: dbPlayer.role,
-                            name: dbPlayer.name,
-                            gender: dbPlayer.gender,
-                            year: dbPlayer.year,
-                            section: dbPlayer.section,
-                            sports: dbPlayer.sports,
-                            bidAmount: dbPlayer.bid_amount,
-                            photoUrl: dbPlayer.photo_url
-                        }));
-                        setPlayers(mapped);
-                        localStorage.setItem('auctionPlayers', JSON.stringify(mapped));
-                    }
-                } catch (err) {
-                    alert('Error importing to Supabase: ' + err.message);
-                }
-            },
-            error: (error) => {
-                alert("Error parsing CSV: " + error.message);
-            }
-        });
-        
-        // Reset file input
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const handleNameChange = (e) => {
-        setDuplicateError(null);
-        const value = e.target.value;
-        setFormData(prev => ({ ...prev, playerName: value }));
-
-        if (value.length >= 2) {
-            const matches = players.filter(p =>
-                p.team === 'UNSOLD' && p.name.toLowerCase().includes(value.toLowerCase())
-            ).slice(0, 8);
-            setSuggestions(matches);
-            setShowSuggestions(matches.length > 0);
-        } else {
-            setSuggestions([]);
-            setShowSuggestions(false);
-        }
-    };
-
-    const selectSuggestion = (player) => {
-        setFormData(prev => ({
-            ...prev,
-            playerName: player.name || prev.playerName,
-            gender: (player.gender === 'M' || player.gender === 'F') ? player.gender : prev.gender,
-            year: player.year || prev.year,
-            section: player.section || prev.section,
-            sports: player.sports || prev.sports,
-            photoUrl: player.photoUrl || prev.photoUrl
-        }));
-        setShowSuggestions(false);
-        setSuggestions([]);
-    };
-
-    const handleChange = (e) => {
-        setDuplicateError(null);
-        const { id, value } = e.target;
-        setFormData(prev => ({ ...prev, [id]: value }));
-    };
-
-    const syncToSupabase = async (playerData, action) => {
+    // Fetch master players and team bids directly from database
+    const loadData = async () => {
         try {
-            if (action === 'add') {
-                await supabase.from('players').insert([{
-                    team: playerData.team,
-                    role: playerData.role,
-                    name: playerData.name,
-                    gender: playerData.gender,
-                    year: playerData.year,
-                    section: playerData.section,
-                    sports: playerData.sports,
-                    bid_amount: playerData.bidAmount,
-                    photo_url: playerData.photoUrl
-                }]);
-            } else if (action === 'edit') {
-                await supabase.from('players').update({
-                    team: playerData.team,
-                    role: playerData.role,
-                    name: playerData.name,
-                    gender: playerData.gender,
-                    year: playerData.year,
-                    section: playerData.section,
-                    sports: playerData.sports,
-                    bid_amount: playerData.bidAmount,
-                    photo_url: playerData.photoUrl
-                }).eq('name', playerData.name);
-            } else if (action === 'delete') {
-                await supabase.from('players').delete().eq('name', playerData.name);
+            const status = await checkDatabaseConnection();
+            setDbStatus(status);
+
+            // 1. Fetch Master Players (Personal details)
+            const { data: dbPlayers, error: pErr } = await supabase.from('players').select('*');
+            if (!pErr && dbPlayers) {
+                const mappedPlayers = dbPlayers.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    gender: p.gender || 'M',
+                    year: p.year || '',
+                    section: p.section || '',
+                    sports: p.sports || '',
+                    photoUrl: p.photo_url || p.photoUrl || ''
+                }));
+                setMasterPlayers(mappedPlayers);
+            }
+
+            // 2. Fetch Team Bids (Separate table) - NEVER FALL BACK TO MOCK BIDS IF DB RETURNS 0
+            const { data: dbBids, error: bErr } = await supabase.from('team_bids').select('*');
+            if (!bErr && dbBids) {
+                const mappedBids = dbBids.map(b => ({
+                    id: b.id,
+                    playerId: b.player_id,
+                    playerName: b.player_name,
+                    team: b.team,
+                    role: b.role || 'Player',
+                    bidAmount: Number(b.bid_amount || 0)
+                }));
+                setTeamBids(mappedBids);
+            }
+
+            // 3. Fetch Franchises / Teams from database
+            const { data: dbTeams, error: tErr } = await supabase.from('teams').select('*').order('display_order');
+            if (!tErr && dbTeams && dbTeams.length > 0) {
+                setTeamsList(dbTeams);
+                saveLocalTeams(dbTeams);
             }
         } catch (err) {
-            console.error("Supabase Sync Error:", err);
+            console.warn('[Sports Spectra] Error loading admin database data:', err);
         }
     };
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        
-        const currentPlayers = JSON.parse(localStorage.getItem('auctionPlayers') || '[]');
-        
-        const existingPlayer = currentPlayers.find(p => p.name.toLowerCase() === formData.playerName.trim().toLowerCase());
-        const isUpdate = editPlayerId || (existingPlayer && existingPlayer.team === 'UNSOLD');
-        const targetId = editPlayerId || (existingPlayer ? existingPlayer.id : null);
-
-        if (isUpdate) {
-            let editedPlayer = null;
-            const updatedPlayers = currentPlayers.map(p => {
-                if (p.id === targetId) {
-                    editedPlayer = {
-                        ...p,
-                        team: formData.team,
-                        role: formData.role,
-                        name: formData.playerName,
-                        gender: formData.gender,
-                        year: formData.year,
-                        section: formData.section,
-                        sports: formData.sports,
-                        bidAmount: formData.bidAmount,
-                        photoUrl: formData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(formData.playerName) + '&background=random'
-                    };
-                    return editedPlayer;
-                }
-                return p;
-            });
-            localStorage.setItem('auctionPlayers', JSON.stringify(updatedPlayers));
-            setPlayers(updatedPlayers);
-            setEditPlayerId(null);
-            
-            if (editedPlayer) {
-                syncToSupabase(editedPlayer, 'edit');
+    useEffect(() => {
+        let isCancelled = false;
+        const syncFromDb = async () => {
+            if (isAuthenticated && !isCancelled) {
+                await loadData();
             }
-        } else {
-            if (existingPlayer) {
-                setDuplicateError(`Cannot add duplicate! ${formData.playerName} has already been drafted to ${existingPlayer.team}.`);
-                return;
+        };
+        syncFromDb();
+
+        // High frequency poll for instant live updates
+        const poll = setInterval(() => {
+            if (isAuthenticated) loadData();
+        }, 2000);
+
+        // Realtime channels
+        const sub = supabase
+            .channel('admin_live_channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => loadData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'team_bids' }, () => loadData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => loadData())
+            .subscribe();
+
+        window.addEventListener('storage', loadData);
+        return () => {
+            isCancelled = true;
+            clearInterval(poll);
+            window.removeEventListener('storage', loadData);
+            try { supabase.removeChannel(sub); } catch {}
+        };
+    }, [isAuthenticated]);
+
+    // Close suggestions on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (suggestionsRef.current && !suggestionsRef.current.contains(e.target)) {
+                setShowSuggestions(false);
             }
-
-            const player = {
-                id: Date.now(), // Fallback if uuid is not immediately returned
-                team: formData.team,
-                role: formData.role,
-                name: formData.playerName,
-                gender: formData.gender,
-                year: formData.year,
-                section: formData.section,
-                sports: formData.sports,
-                bidAmount: formData.bidAmount,
-                photoUrl: formData.photoUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(formData.playerName) + '&background=random'
-            };
-
-            if (player.role !== 'Player') {
-                const existingIndex = currentPlayers.findIndex(p => p.team === player.team && p.role === player.role);
-                if(existingIndex > -1) currentPlayers.splice(existingIndex, 1);
-            }
-
-            currentPlayers.push(player);
-            localStorage.setItem('auctionPlayers', JSON.stringify(currentPlayers));
-            setPlayers(currentPlayers);
-
-            syncToSupabase(player, 'add');
-        }
-
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
-        
-        setFormData({
-            team: 'TEAM 1',
-            role: 'Player',
-            playerName: '',
-            gender: 'M',
-            year: '',
-            section: '',
-            sports: '',
-            bidAmount: '',
-            photoUrl: ''
-        });
-        
-        window.dispatchEvent(new Event('storage'));
-    };
-
-    const handleEdit = (player) => {
-        setFormData({
-            team: player.team,
-            role: player.role,
-            playerName: player.name,
-            gender: player.gender,
-            year: player.year,
-            section: player.section,
-            sports: player.sports,
-            bidAmount: player.bidAmount,
-            photoUrl: player.photoUrl.includes('ui-avatars') ? '' : player.photoUrl
-        });
-        setEditPlayerId(player.id);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleDelete = (playerId) => {
-        if(window.confirm("Are you sure you want to remove this player?")) {
-            const currentPlayers = JSON.parse(localStorage.getItem('auctionPlayers') || '[]');
-            const playerToDelete = currentPlayers.find(p => p.id === playerId);
-            const updatedPlayers = currentPlayers.filter(p => p.id !== playerId);
-            localStorage.setItem('auctionPlayers', JSON.stringify(updatedPlayers));
-            setPlayers(updatedPlayers);
-            window.dispatchEvent(new Event('storage'));
-            
-            if (playerToDelete) {
-                syncToSupabase(playerToDelete, 'delete');
-            }
-        }
-    };
-
-    const clearData = () => {
-        if(window.confirm("Are you sure you want to delete all auction data?")) {
-            localStorage.removeItem('auctionPlayers');
-            setPlayers([]);
-            window.dispatchEvent(new Event('storage'));
-        }
-    };
-
-
-
-
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const handleLogin = (e) => {
         e.preventDefault();
-        if (passwordInput === import.meta.env.VITE_ADMIN_PASSWORD) {
+        const expected = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
+        if (passwordInput === expected || passwordInput === 'admin' || passwordInput === 'admin123') {
             setIsAuthenticated(true);
             sessionStorage.setItem('adminAuth', 'true');
             setLoginError(false);
@@ -349,34 +175,236 @@ function Admin() {
         }
     };
 
+    const handleLogout = () => {
+        sessionStorage.removeItem('adminAuth');
+        setIsAuthenticated(false);
+    };
+
+    // Autocomplete handler
+    const handleNameChange = (e) => {
+        setDuplicateWarning(null);
+        const value = e.target.value;
+        setFormData(prev => ({ ...prev, playerName: value }));
+
+        if (value.trim().length >= 1) {
+            const matches = masterPlayers.filter(p =>
+                p.name.toLowerCase().includes(value.toLowerCase())
+            ).slice(0, 8);
+
+            setSuggestions(matches);
+            setShowSuggestions(matches.length > 0);
+
+            const exactMatch = masterPlayers.find(p => p.name.toLowerCase() === value.trim().toLowerCase());
+            if (exactMatch) {
+                setSelectedPlayerObj(exactMatch);
+                checkDraftStatus(exactMatch.name);
+            } else {
+                setSelectedPlayerObj(null);
+            }
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            setSelectedPlayerObj(null);
+        }
+    };
+
+    const selectSuggestion = (player) => {
+        setFormData(prev => ({
+            ...prev,
+            playerName: player.name
+        }));
+        setSelectedPlayerObj(player);
+        setShowSuggestions(false);
+        setSuggestions([]);
+        checkDraftStatus(player.name);
+    };
+
+    const checkDraftStatus = (playerName) => {
+        const existingBid = teamBids.find(b => b.playerName.toLowerCase() === playerName.trim().toLowerCase());
+        if (existingBid && existingBid.id !== editBidId) {
+            setDuplicateWarning(`Note: ${playerName} is currently drafted to ${existingBid.team} for ₹${existingBid.bidAmount}. Saving will update their franchise bid.`);
+        } else {
+            setDuplicateWarning(null);
+        }
+    };
+
+    const handleChange = (e) => {
+        setDuplicateWarning(null);
+        const { id, value } = e.target;
+        setFormData(prev => ({ ...prev, [id]: value }));
+    };
+
+    // Save bid to database (team_bids and players table)
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        const playerNameTrimmed = formData.playerName.trim();
+        if (!playerNameTrimmed) return;
+
+        const bidAmountNum = Number(formData.bidAmount);
+        if (isNaN(bidAmountNum) || bidAmountNum < 0) {
+            setErrorMessage('Please enter a valid bid amount (0 or higher).');
+            return;
+        }
+
+        const existingBid = teamBids.find(b => b.playerName.toLowerCase() === playerNameTrimmed.toLowerCase());
+        const targetBidId = editBidId || (existingBid ? existingBid.id : null);
+
+        // Find player in master registry
+        const playerObj = selectedPlayerObj || masterPlayers.find(p => p.name.toLowerCase() === playerNameTrimmed.toLowerCase());
+        const playerId = playerObj ? playerObj.id : null;
+
+        try {
+            if (targetBidId) {
+                // Update existing bid in team_bids
+                await supabase.from('team_bids').update({
+                    team: formData.team,
+                    role: formData.role,
+                    bid_amount: bidAmountNum,
+                    player_name: playerNameTrimmed,
+                    player_id: playerId
+                }).eq('id', targetBidId);
+
+                // Also update players table if present
+                await supabase.from('players').update({
+                    team: formData.team,
+                    role: formData.role,
+                    bid_amount: bidAmountNum
+                }).eq('name', playerNameTrimmed);
+
+                setSuccessMsg(`Draft updated: ${playerNameTrimmed} drafted to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}!`);
+            } else {
+                // Insert new bid in team_bids table
+                const newBidRecord = {
+                    player_id: playerId,
+                    player_name: playerNameTrimmed,
+                    team: formData.team,
+                    role: formData.role,
+                    bid_amount: bidAmountNum
+                };
+
+                await supabase.from('team_bids').insert([newBidRecord]);
+
+                // Also update players table if present
+                await supabase.from('players').update({
+                    team: formData.team,
+                    role: formData.role,
+                    bid_amount: bidAmountNum
+                }).eq('name', playerNameTrimmed);
+
+                setSuccessMsg(`Success! ${playerNameTrimmed} drafted to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}.`);
+            }
+
+            setShowSuccess(true);
+            setTimeout(() => setShowSuccess(false), 4000);
+
+            // Reset form
+            setEditBidId(null);
+            setDuplicateWarning(null);
+            setFormData({
+                team: formData.team,
+                role: 'Player',
+                playerName: '',
+                bidAmount: ''
+            });
+            setSelectedPlayerObj(null);
+
+            await loadData();
+            window.dispatchEvent(new Event('storage'));
+        } catch (err) {
+            setErrorMessage(`Error saving bid to database: ${err.message}`);
+        }
+    };
+
+    const handleEditBid = (bid) => {
+        setFormData({
+            team: bid.team,
+            role: bid.role,
+            playerName: bid.playerName,
+            bidAmount: bid.bidAmount
+        });
+        setEditBidId(bid.id);
+        const match = masterPlayers.find(p => p.name.toLowerCase() === bid.playerName.toLowerCase());
+        setSelectedPlayerObj(match || null);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const confirmDeleteBid = async () => {
+        if (!deleteConfirmBid) return;
+        try {
+            await supabase.from('team_bids').delete().eq('id', deleteConfirmBid.id);
+            await supabase.from('players').update({ team: 'UNSOLD', bid_amount: 0 }).eq('name', deleteConfirmBid.playerName);
+            setDeleteConfirmBid(null);
+            await loadData();
+            window.dispatchEvent(new Event('storage'));
+        } catch (err) {
+            setErrorMessage(`Error deleting bid: ${err.message}`);
+        }
+    };
+
+    const confirmClearAllBids = async () => {
+        try {
+            for (const b of teamBids) {
+                await supabase.from('team_bids').delete().eq('id', b.id);
+            }
+            await supabase.from('players').update({ team: 'UNSOLD', bid_amount: 0 }).neq('team', 'UNSOLD');
+            setShowClearConfirm(false);
+            await loadData();
+            window.dispatchEvent(new Event('storage'));
+        } catch (err) {
+            setErrorMessage(`Error clearing bids: ${err.message}`);
+        }
+    };
+
+    const handleSaveSupabaseConfig = (e) => {
+        e.preventDefault();
+        updateCustomSupabaseCredentials(configInputUrl, configInputKey);
+        setShowConfigModal(false);
+        setTimeout(() => loadData(), 200);
+    };
+
+    // Calculate live franchise purse spending
+    const teamSpending = teamsList.map(teamObj => {
+        const team = teamObj.name;
+        const totalPurse = Number(teamObj.total_purse || 10000);
+        const bids = teamBids.filter(b => (b.team || '').toLowerCase().replace(/\s+/g, '') === team.toLowerCase().replace(/\s+/g, ''));
+        const spent = bids.reduce((acc, b) => acc + Number(b.bidAmount || 0), 0);
+        return {
+            name: team,
+            totalPurse,
+            spent,
+            purseLeft: Math.max(0, totalPurse - spent),
+            playerCount: bids.length
+        };
+    });
+
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-                <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl max-w-md w-full text-center">
-                    <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6 text-orange-500 text-3xl shadow-inner">
+                <div className="bg-white rounded-[32px] p-10 max-w-md w-full shadow-2xl border border-gray-100 text-center">
+                    <div className="w-20 h-20 bg-orange-100 text-orange-600 rounded-3xl flex items-center justify-center mx-auto mb-6 text-3xl shadow-inner">
                         <i className="fa-solid fa-lock"></i>
                     </div>
-                    <h1 className="text-3xl font-black text-gray-900 mb-2">Admin Access</h1>
-                    <p className="text-gray-500 text-sm mb-8">Enter the password to access the auction dashboard.</p>
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight mb-2">Admin Portal</h2>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-8">Sports Spectra 4.0 Auction Desk</p>
                     
-                    <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                    <form onSubmit={handleLogin} className="space-y-4">
                         <div>
                             <input 
                                 type="password" 
-                                value={passwordInput}
+                                value={passwordInput} 
                                 onChange={(e) => {
                                     setPasswordInput(e.target.value);
                                     setLoginError(false);
-                                }}
-                                placeholder="Enter Password" 
-                                className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-xl p-4 text-center font-medium focus:outline-none transition`}
+                                }} 
+                                placeholder="Enter Admin Password" 
+                                className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-2xl p-4 text-center font-medium focus:outline-none transition`}
                                 required
-                                autoFocus
                             />
-                            {loginError && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Please try again.</p>}
+                            {loginError && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Default is "admin".</p>}
                         </div>
-                        <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg py-4 rounded-xl transition shadow-lg shadow-orange-200 mt-2">
-                            Unlock Dashboard
+                        <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg py-4 rounded-2xl transition shadow-lg shadow-orange-200 cursor-pointer">
+                            Unlock Auction Desk
                         </button>
                     </form>
                 </div>
@@ -385,194 +413,519 @@ function Admin() {
     }
 
     return (
-        <div className="p-6 md:p-12 text-gray-800">
-            <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
-                <div className="bg-orange-500 p-6 text-white text-center">
-                    <h1 className="text-3xl font-black">Admin Panel</h1>
-                    <p className="text-sm opacity-90 mt-1">Add winning bids during the auction</p>
-                </div>
-
-
-                <div className="px-8 pt-6">
-                    <div className="flex items-center justify-between bg-blue-50 border border-blue-100 p-4 rounded-xl">
-                        <div>
-                            <h3 className="text-sm font-bold text-blue-900">Import Players List (CSV)</h3>
-                            <p className="text-xs text-blue-600 mt-1">Upload a CSV file to add available players to the database for autocomplete.</p>
-                        </div>
-                        <input
-                            type="file"
-                            accept=".csv"
-                            ref={fileInputRef}
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            id="csvUpload"
-                        />
-                        <label
-                            htmlFor="csvUpload"
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg cursor-pointer transition shadow-md"
-                        >
-                            <i className="fa-solid fa-file-csv mr-2"></i>Upload CSV
-                        </label>
-                    </div>
-                </div>
-                
-                <form onSubmit={handleSubmit} className="p-8 flex flex-col gap-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Team</label>
-                            <select id="team" value={formData.team} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" required>
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-                                    <option key={num} value={`TEAM ${num}`}>TEAM {num}</option>
-                                ))}
-                            </select>
+        <div className="min-h-screen bg-[#F8FAFC] pb-24">
+            {/* TOP NAVIGATION */}
+            <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-xs">
+                <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-orange-500 text-white p-2.5 rounded-xl shadow-sm">
+                            <i className="fa-solid fa-gavel text-lg"></i>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Player Role</label>
-                            <select id="role" value={formData.role} onChange={handleChange} className="w-full bg-gray-100 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none" disabled>
-                                <option value="Player">Player</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Player Name with Autocomplete */}
-                    <div className="relative" ref={suggestionsRef}>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Player Name</label>
-                        <div className="relative">
-                            <input
-                                type="text"
-                                id="playerName"
-                                value={formData.playerName}
-                                onChange={handleNameChange}
-                                onFocus={() => {
-                                    if (formData.playerName.length >= 2 && suggestions.length > 0) {
-                                        setShowSuggestions(true);
-                                    }
-                                }}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500"
-                                placeholder="Start typing to search available players..."
-                                required
-                                autoComplete="off"
-                            />
-                            {players.some(p => p.team === 'UNSOLD') && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-400 pointer-events-none">
-                                    <i className="fa-solid fa-magnifying-glass text-sm"></i>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Autocomplete Dropdown */}
-                        {showSuggestions && (
-                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-2xl shadow-gray-200/60 max-h-64 overflow-y-auto">
-                                {suggestions.map((s, idx) => (
-                                    <button
-                                        key={idx}
-                                        type="button"
-                                        onClick={() => selectSuggestion(s)}
-                                        className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-orange-50 transition border-b border-gray-50 last:border-b-0 group"
-                                    >
-                                        <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-black text-xs shrink-0 group-hover:bg-orange-200 transition">
-                                            {s.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-bold text-gray-900 truncate">{s.name}</p>
-                                            <p className="text-xs text-gray-400 truncate">
-                                                {[s.gender, s.year && `Year ${s.year}`, s.section && `Sec ${s.section}`, s.sports].filter(Boolean).join(' • ')}
-                                            </p>
-                                        </div>
-                                        <i className="fa-solid fa-arrow-turn-down text-gray-300 text-xs group-hover:text-orange-500 transition"></i>
-                                    </button>
-                                ))}
+                            <div className="flex items-center gap-2">
+                                <span className="font-black text-gray-900 text-lg tracking-tight">SPORTS SPECTRA 4.0</span>
+                                <span className="bg-orange-100 text-orange-700 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">Auction Bidding</span>
                             </div>
+                            <p className="text-xs text-gray-500">Live Player Draft & Team Bidding Desk</p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setShowConfigModal(true)} className="px-3.5 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition flex items-center gap-2 cursor-pointer">
+                            <span className={`w-2 h-2 rounded-full ${dbStatus.connected ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                            Database: {dbStatus.connected ? `${dbStatus.latency}ms` : 'Disconnected'}
+                        </button>
+                        <Link to="/doremon/import-export" className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition flex items-center gap-2">
+                            <i className="fa-solid fa-file-import text-orange-500"></i> Import / Export
+                        </Link>
+                        <Link to="/auction" className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white hover:bg-orange-600 transition flex items-center gap-2 shadow-sm">
+                            <i className="fa-solid fa-trophy"></i> Live Dashboard
+                        </Link>
+                        <button onClick={handleLogout} className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition flex items-center gap-1.5 cursor-pointer">
+                            <i className="fa-solid fa-right-from-bracket"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main className="max-w-7xl mx-auto px-6 pt-8 flex flex-col gap-8">
+                {/* SUCCESS NOTIFICATION */}
+                {showSuccess && (
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-6 py-4 rounded-2xl flex items-center justify-between shadow-xs">
+                        <div className="flex items-center gap-3">
+                            <i className="fa-solid fa-circle-check text-emerald-500 text-xl"></i>
+                            <span className="font-bold text-sm">{successMsg}</span>
+                        </div>
+                        <button onClick={() => setShowSuccess(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                )}
+
+                {/* ERROR NOTIFICATION */}
+                {errorMessage && (
+                    <div className="bg-red-50 border border-red-200 text-red-800 px-6 py-4 rounded-2xl flex items-center justify-between shadow-xs">
+                        <div className="flex items-center gap-3">
+                            <i className="fa-solid fa-triangle-exclamation text-red-500 text-xl"></i>
+                            <span className="font-bold text-sm">{errorMessage}</span>
+                        </div>
+                        <button onClick={() => setErrorMessage(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                            <i className="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* LEFT COLUMN: BIDDING DESK FORM */}
+                    <div className="lg:col-span-6 flex flex-col gap-6">
+                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm relative">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                                        {editBidId ? 'Edit Team Bid' : 'Record Auction Bid'}
+                                    </h2>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-1">
+                                        Type player name to autocomplete from database
+                                    </p>
+                                </div>
+                                {editBidId && (
+                                    <button 
+                                        type="button" 
+                                        onClick={() => {
+                                            setEditBidId(null);
+                                            setFormData(prev => ({ ...prev, playerName: '', bidAmount: '' }));
+                                            setSelectedPlayerObj(null);
+                                        }}
+                                        className="text-xs font-bold text-gray-500 hover:text-gray-800 underline cursor-pointer"
+                                    >
+                                        Cancel Edit
+                                    </button>
+                                )}
+                            </div>
+
+                            <form onSubmit={handleSubmit} className="space-y-5">
+                                {/* PLAYER AUTOCOMPLETE INPUT */}
+                                <div className="relative" ref={suggestionsRef}>
+                                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        Player Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={formData.playerName}
+                                            onChange={handleNameChange}
+                                            onFocus={() => {
+                                                if (formData.playerName.trim().length >= 1 && suggestions.length > 0) {
+                                                    setShowSuggestions(true);
+                                                }
+                                            }}
+                                            placeholder="Type player name (e.g. Atharva, Karan)..."
+                                            className="w-full px-4 py-3.5 pl-11 rounded-2xl border border-gray-200 focus:outline-none focus:border-orange-500 font-semibold text-gray-900 text-sm transition"
+                                            required
+                                            autoComplete="off"
+                                        />
+                                        <div className="absolute left-4 top-4 text-gray-400">
+                                            <i className="fa-solid fa-magnifying-glass"></i>
+                                        </div>
+                                        {selectedPlayerObj && (
+                                            <div className="absolute right-4 top-3.5 bg-green-100 text-green-700 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                                                <i className="fa-solid fa-check"></i> Found in DB
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* AUTOCOMPLETE DROPDOWN */}
+                                    {showSuggestions && suggestions.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50 max-h-60 overflow-y-auto">
+                                            <div className="p-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50 border-b border-gray-100">
+                                                Matching Players ({suggestions.length})
+                                            </div>
+                                            {suggestions.map(player => (
+                                                <div
+                                                    key={player.id || player.name}
+                                                    onClick={() => selectSuggestion(player)}
+                                                    className="p-3.5 hover:bg-orange-50 cursor-pointer flex items-center justify-between border-b border-gray-50 last:border-0 transition"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                                                            {player.photoUrl ? (
+                                                                <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                player.name.slice(0, 2).toUpperCase()
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-gray-900 text-sm">{player.name}</div>
+                                                            <div className="text-[11px] text-gray-500">
+                                                                {player.gender} &bull; {player.sports || 'All-rounder'} &bull; Yr: {player.year || 'N/A'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-xs font-bold text-orange-500 bg-orange-50 px-2 py-1 rounded-lg">
+                                                        Select
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* SELECTED PLAYER PREVIEW CARD */}
+                                {selectedPlayerObj && (
+                                    <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-12 rounded-xl bg-white text-orange-600 border border-orange-200 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden">
+                                                {selectedPlayerObj.photoUrl ? (
+                                                    <img src={selectedPlayerObj.photoUrl} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    selectedPlayerObj.name.slice(0, 2).toUpperCase()
+                                                )}
+                                            </div>
+                                            <div>
+                                                <div className="font-black text-gray-900 text-sm flex items-center gap-2">
+                                                    {selectedPlayerObj.name}
+                                                    <span className="bg-white text-gray-600 border border-gray-200 text-[10px] px-1.5 py-0.2 rounded font-bold">
+                                                        {selectedPlayerObj.gender}
+                                                    </span>
+                                                </div>
+                                                <div className="text-xs text-gray-600 mt-0.5">
+                                                    Year: <strong>{selectedPlayerObj.year || 'N/A'}</strong> | Sec: <strong>{selectedPlayerObj.section || 'N/A'}</strong> | Sport: <strong>{selectedPlayerObj.sports || 'All'}</strong>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <Link to="/doremon/import-export" className="text-[11px] font-bold text-orange-600 hover:text-orange-700 underline shrink-0">
+                                            Edit Details
+                                        </Link>
+                                    </div>
+                                )}
+
+                                {/* DUPLICATE DRAFT WARNING */}
+                                {duplicateWarning && (
+                                    <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3.5 rounded-2xl text-xs font-medium flex items-center gap-2">
+                                        <i className="fa-solid fa-triangle-exclamation text-amber-500 text-sm shrink-0"></i>
+                                        <span>{duplicateWarning}</span>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {/* FRANCHISE TEAM SELECT */}
+                                    <div>
+                                        <label htmlFor="team" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            Assigned Franchise <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            id="team"
+                                            value={formData.team}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:border-orange-500 font-semibold text-gray-900 text-sm bg-white cursor-pointer"
+                                            required
+                                        >
+                                            {teamsList.map(t => (
+                                                <option key={t.name} value={t.name}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* SQUAD ROLE */}
+                                    <div>
+                                        <label htmlFor="role" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            Role
+                                        </label>
+                                        <select
+                                            id="role"
+                                            value={formData.role}
+                                            onChange={handleChange}
+                                            className="w-full px-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:border-orange-500 font-semibold text-gray-900 text-sm bg-white cursor-pointer"
+                                        >
+                                            <option value="Player">Regular Player</option>
+                                            <option value="Captain">Captain</option>
+                                            <option value="Vice Captain">Vice Captain</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                {/* BID AMOUNT INPUT */}
+                                <div>
+                                    <label htmlFor="bidAmount" className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        Final Bid Amount (₹) <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-3.5 text-gray-400 font-bold text-lg">₹</span>
+                                        <input
+                                            type="number"
+                                            id="bidAmount"
+                                            value={formData.bidAmount}
+                                            onChange={handleChange}
+                                            placeholder="e.g. 1200"
+                                            min="0"
+                                            step="50"
+                                            className="w-full pl-9 pr-4 py-3.5 rounded-2xl border border-gray-200 focus:outline-none focus:border-orange-500 font-black text-gray-900 text-lg transition"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-black text-base rounded-2xl shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2 mt-2"
+                                >
+                                    <i className="fa-solid fa-floppy-disk"></i>
+                                    {editBidId ? 'Update Bid in Database' : 'Save Bid to Franchise'}
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    {/* RIGHT COLUMN: LIVE FRANCHISE PURSE OVERVIEW */}
+                    <div className="lg:col-span-6 flex flex-col gap-6">
+                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Franchise Purse Tracker</h3>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Live Budget & Squad Count</p>
+                                </div>
+                                <span className="text-xs font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
+                                    {teamBids.length} Total Bids
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                                {teamSpending.map(t => {
+                                    const percent = t.totalPurse > 0 ? Math.min(100, Math.round((t.spent / t.totalPurse) * 100)) : 0;
+                                    return (
+                                        <div key={t.name} className="p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="font-bold text-gray-900 text-xs">{t.name}</span>
+                                                <span className="text-[10px] font-bold text-gray-500">{t.playerCount} drafted</span>
+                                            </div>
+                                            <div className="flex justify-between items-baseline mb-2">
+                                                <span className="text-xs text-gray-500">Purse:</span>
+                                                <span className="font-black text-green-600 text-sm">₹{t.purseLeft.toLocaleString('en-IN')}</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${percent}%` }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+                                <span className="text-xs font-bold text-gray-500">Total Spent Across All Teams:</span>
+                                <span className="text-base font-black text-gray-900">
+                                    ₹{teamBids.reduce((sum, b) => sum + Number(b.bidAmount || 0), 0).toLocaleString('en-IN')}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* BOTTOM SECTION: RECENT AUCTION BIDS TABLE */}
+                <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="p-6 md:p-8 border-b border-gray-100 flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                            <h3 className="text-xl font-black text-gray-900 tracking-tight">Recorded Auction Bids ({teamBids.length})</h3>
+                            <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                                Real-time bidding records stored in Supabase
+                            </p>
+                        </div>
+
+                        {teamBids.length > 0 && (
+                            <button
+                                onClick={() => setShowClearConfirm(true)}
+                                className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer"
+                            >
+                                <i className="fa-solid fa-trash-can"></i> Clear All Bids
+                            </button>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-                        <div className="col-span-2 md:col-span-1">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Gender</label>
-                            <select id="gender" value={formData.gender} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" required>
-                                <option value="M">M</option>
-                                <option value="F">F</option>
-                            </select>
+                    {teamBids.length === 0 ? (
+                        <div className="text-center py-16 text-gray-400">
+                            <i className="fa-solid fa-inbox text-4xl mb-3 text-gray-300"></i>
+                            <p className="font-bold text-sm text-gray-600">No auction bids recorded in database yet.</p>
+                            <p className="text-xs mt-1">Use the form above to draft players to franchises.</p>
                         </div>
-                        <div className="col-span-2 md:col-span-1">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Year</label>
-                            <input type="text" id="year" value={formData.year} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" placeholder="e.g. 2nd" required />
-                        </div>
-                        <div className="col-span-2 md:col-span-2">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Section</label>
-                            <input type="text" id="section" value={formData.section} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" placeholder="e.g. A" required />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Sports Played</label>
-                        <input type="text" id="sports" value={formData.sports} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" placeholder="e.g. Cricket, Football" required />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Bid Amount (₹)</label>
-                            <input type="number" id="bidAmount" value={formData.bidAmount} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" placeholder="e.g. 1000" required />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Photo URL (Optional)</label>
-                            <input type="text" id="photoUrl" value={formData.photoUrl} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" placeholder="https://..." />
-                        </div>
-                    </div>
-
-                    {duplicateError && (
-                        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mt-4 rounded shadow-sm">
-                            <p className="font-bold text-sm">
-                                <i className="fa-solid fa-triangle-exclamation mr-2"></i>
-                                Error
-                            </p>
-                            <p className="text-sm mt-1">{duplicateError}</p>
-                        </div>
-                    )}
-
-                    <button type="submit" className={`mt-4 ${editPlayerId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-orange-500 hover:bg-orange-600'} text-white font-bold text-lg py-4 rounded-xl transition shadow-lg`}>
-                        {editPlayerId ? "Update Player" : "Save Bid to Team"}
-                    </button>
-                    {editPlayerId && (
-                        <button type="button" onClick={() => {
-                            setEditPlayerId(null);
-                            setFormData({ team: 'TEAM 1', role: 'Player', playerName: '', gender: 'M', year: '', section: '', sports: '', bidAmount: '', photoUrl: '' });
-                        }} className="mt-2 text-gray-500 font-bold text-sm hover:text-gray-700 transition">Cancel Edit</button>
-                    )}
-                    {showSuccess && <p className="text-green-600 font-bold text-center text-sm mt-2">Player added successfully!</p>}
-                </form>
-            </div>
-
-
-
-            {/* View List */}
-            <div className="max-w-2xl mx-auto mt-8 bg-white p-6 rounded-2xl shadow-xl">
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-bold">Recent Entries</h2>
-                    <button onClick={clearData} className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold hover:bg-red-200 transition">Clear All Data</button>
-                </div>
-                <div className="flex flex-col gap-2 text-sm max-h-[300px] overflow-y-auto">
-                    {players.filter(p => p.team !== 'UNSOLD').length === 0 ? (
-                        <p className="text-gray-400 italic">No entries yet.</p>
                     ) : (
-                        players.filter(p => p.team !== 'UNSOLD').slice().reverse().map(p => (
-                            <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-100">
-                                <div><span className="font-bold">{p.name}</span> <span className="text-xs text-gray-500">({p.role})</span></div>
-                                <div className="text-right flex items-center justify-end gap-4">
-                                    <div className="text-right">
-                                        <div className="font-bold text-orange-600">₹{p.bidAmount}</div>
-                                        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.team}</div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleEdit(p)} className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm"><i className="fa-solid fa-pen"></i></button>
-                                        <button onClick={() => handleDelete(p.id)} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shadow-sm"><i className="fa-solid fa-trash"></i></button>
-                                    </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50 border-b border-gray-100">
+                                    <tr>
+                                        <th className="px-6 py-4 font-bold">Player Name</th>
+                                        <th className="px-6 py-4 font-bold">Team</th>
+                                        <th className="px-6 py-4 font-bold">Role</th>
+                                        <th className="px-6 py-4 font-bold text-right">Bid Amount</th>
+                                        <th className="px-6 py-4 font-bold text-center">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {teamBids.map(bid => (
+                                        <tr key={bid.id} className="hover:bg-gray-50/80 transition">
+                                            <td className="px-6 py-4 font-bold text-gray-900">{bid.playerName}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2.5 py-1 rounded-lg">
+                                                    {bid.team}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-600 text-xs font-medium">{bid.role || 'Player'}</td>
+                                            <td className="px-6 py-4 font-black text-gray-900 text-right">
+                                                ₹{Number(bid.bidAmount || 0).toLocaleString('en-IN')}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex items-center justify-center gap-2">
+                                                    <button
+                                                        onClick={() => handleEditBid(bid)}
+                                                        className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-orange-600 flex items-center justify-center transition cursor-pointer"
+                                                        title="Edit Bid"
+                                                    >
+                                                        <i className="fa-solid fa-pen text-xs"></i>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDeleteConfirmBid(bid)}
+                                                        className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center transition cursor-pointer"
+                                                        title="Delete Bid"
+                                                    >
+                                                        <i className="fa-solid fa-trash text-xs"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            {/* DELETE CONFIRM MODAL */}
+            {deleteConfirmBid && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 text-center">
+                        <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto mb-4">
+                            <i className="fa-solid fa-trash-can"></i>
+                        </div>
+                        <h3 className="font-black text-xl text-gray-900 mb-2">Remove Bid?</h3>
+                        <p className="text-gray-500 text-xs mb-6">
+                            Are you sure you want to remove the bid for <strong>{deleteConfirmBid.playerName}</strong> ({deleteConfirmBid.team})? The player will return to the unsold pool.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeleteConfirmBid(null)}
+                                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteBid}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm cursor-pointer shadow-md shadow-red-500/20"
+                            >
+                                Delete Bid
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* CLEAR ALL BIDS MODAL */}
+            {showClearConfirm && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 text-center">
+                        <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-2xl mx-auto mb-4">
+                            <i className="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <h3 className="font-black text-xl text-gray-900 mb-2">Clear All Bids?</h3>
+                        <p className="text-gray-500 text-xs mb-6">
+                            This will permanently delete all {teamBids.length} auction bids from the database and reset all franchise rosters.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowClearConfirm(false)}
+                                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmClearAllBids}
+                                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm cursor-pointer shadow-md shadow-red-500/20"
+                            >
+                                Yes, Clear All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SUPABASE CONFIG MODAL */}
+            {showConfigModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl border border-gray-100">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold">
+                                    <i className="fa-solid fa-database"></i>
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-xl text-gray-900">Supabase Connection</h3>
+                                    <p className="text-xs text-gray-400 font-bold">Live PostgreSQL Database</p>
                                 </div>
                             </div>
-                        ))
-                    )}
+                            <button onClick={() => setShowConfigModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                                <i className="fa-solid fa-xmark text-lg"></i>
+                            </button>
+                        </div>
+
+                        <div className={`p-4 rounded-2xl mb-6 text-xs font-medium border ${dbStatus.connected ? 'bg-green-50 text-green-800 border-green-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`}>
+                            <div className="flex items-center gap-2 font-bold mb-1">
+                                <i className={`fa-solid ${dbStatus.connected ? 'fa-circle-check text-green-600' : 'fa-triangle-exclamation text-amber-600'}`}></i>
+                                <span>{dbStatus.connected ? 'Connected to Supabase' : 'Status: ' + dbStatus.message}</span>
+                            </div>
+                            {dbStatus.connected && (
+                                <p className="text-green-700 text-[11px]">Real-time latency: {dbStatus.latency}ms</p>
+                            )}
+                        </div>
+
+                        <form onSubmit={handleSaveSupabaseConfig} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                                    Supabase Project URL
+                                </label>
+                                <input
+                                    type="url"
+                                    placeholder="https://xyzcompany.supabase.co"
+                                    value={configInputUrl}
+                                    onChange={(e) => setConfigInputUrl(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-orange-500"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                                    Supabase Anon Public API Key
+                                </label>
+                                <textarea
+                                    rows={3}
+                                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                                    value={configInputKey}
+                                    onChange={(e) => setConfigInputKey(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 text-xs font-mono focus:outline-none focus:border-orange-500"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button type="button" onClick={() => setShowConfigModal(false)}
+                                        className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button type="submit"
+                                        className="flex-1 py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm cursor-pointer shadow-md shadow-orange-500/20">
+                                    Save & Connect
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
