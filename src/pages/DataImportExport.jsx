@@ -9,14 +9,34 @@ import {
   getLocalTeamBids,
   getLocalTeams,
   saveLocalTeams,
-  getSupabaseConfig,
-  updateCustomSupabaseCredentials
+  updateCustomSupabaseCredentials,
+  validateAdminSession,
+  createAdminSession,
+  clearAdminSession,
+  checkLoginRateLimit,
+  recordFailedLogin,
+  resetLoginAttempts,
+  sanitizeCsvCell
 } from '../supabaseClient';
 
 export default function DataImportExport() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('adminAuth') === 'true');
+  const [isAuthenticated, setIsAuthenticated] = useState(() => validateAdminSession());
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
+  const [lockoutTime, setLockoutTime] = useState(() => checkLoginRateLimit());
+
+  useEffect(() => {
+    let interval;
+    if (lockoutTime > 0) {
+      interval = setInterval(() => {
+        setLockoutTime((prev) => {
+          if (prev <= 1) return 0;
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [lockoutTime]);
 
   // Database status
   const [dbStatus, setDbStatus] = useState({ loading: true, connected: false, latency: 0, message: '' });
@@ -163,19 +183,26 @@ export default function DataImportExport() {
 
   const handleLogin = (e) => {
     e.preventDefault();
-    const expected = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
-    if (passwordInput === expected || passwordInput === 'admin' || passwordInput === 'admin123') {
+    if (lockoutTime > 0) return;
+    
+    const expected = import.meta.env.VITE_ADMIN_PASSWORD || '';
+    if (passwordInput === expected && expected !== '') {
+      createAdminSession(expected);
       setIsAuthenticated(true);
-      sessionStorage.setItem('adminAuth', 'true');
       setLoginError(false);
+      resetLoginAttempts();
     } else {
+      const remainingLockout = recordFailedLogin();
+      if (remainingLockout > 0) {
+        setLockoutTime(remainingLockout);
+      }
       setLoginError(true);
       setPasswordInput('');
     }
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('adminAuth');
+    clearAdminSession();
     setIsAuthenticated(false);
   };
 
@@ -363,13 +390,13 @@ export default function DataImportExport() {
       return;
     }
     const csv = Papa.unparse(allPlayers.map(p => ({
-      ID: p.id,
-      Name: p.name,
-      Gender: p.gender,
-      Year: p.year,
-      Section: p.section,
-      Sports: p.sports,
-      Photo_URL: p.photo_url || ''
+      ID: sanitizeCsvCell(p.id),
+      Name: sanitizeCsvCell(p.name),
+      Gender: sanitizeCsvCell(p.gender),
+      Year: sanitizeCsvCell(p.year),
+      Section: sanitizeCsvCell(p.section),
+      Sports: sanitizeCsvCell(p.sports),
+      Photo_URL: sanitizeCsvCell(p.photo_url || '')
     })));
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -389,12 +416,12 @@ export default function DataImportExport() {
       return;
     }
     const csv = Papa.unparse(bids.map(b => ({
-      Bid_ID: b.id,
-      Player_Name: b.player_name,
-      Team: b.team,
-      Role: b.role,
-      Bid_Amount: b.bid_amount,
-      Created_At: b.created_at || ''
+      Bid_ID: sanitizeCsvCell(b.id),
+      Player_Name: sanitizeCsvCell(b.player_name),
+      Team: sanitizeCsvCell(b.team),
+      Role: sanitizeCsvCell(b.role),
+      Bid_Amount: sanitizeCsvCell(b.bid_amount),
+      Created_At: sanitizeCsvCell(b.created_at || '')
     })));
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -503,15 +530,16 @@ export default function DataImportExport() {
                   setPasswordInput(e.target.value);
                   setLoginError(false);
                 }}
-                placeholder="Enter Password (default: admin)" 
+                placeholder="Enter Admin Password" 
                 className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-xl p-4 text-center font-medium focus:outline-none transition`}
                 required
                 autoFocus
               />
-              {loginError && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Default is "admin".</p>}
+              {loginError && !lockoutTime && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Please try again.</p>}
+              {lockoutTime > 0 && <p className="text-red-500 text-xs font-bold mt-2">Too many failed attempts. Locked out for {lockoutTime}s.</p>}
             </div>
-            <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg py-4 rounded-xl transition shadow-lg shadow-orange-200 mt-2 cursor-pointer">
-              Access Data Manager
+            <button type="submit" disabled={lockoutTime > 0} className={`w-full text-white font-bold text-lg py-4 rounded-xl transition shadow-lg mt-2 cursor-pointer ${lockoutTime > 0 ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-200'}`}>
+              {lockoutTime > 0 ? `Locked (${lockoutTime}s)` : 'Access Data Manager'}
             </button>
           </form>
         </div>

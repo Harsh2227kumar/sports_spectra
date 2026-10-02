@@ -53,26 +53,6 @@ export const getSupabaseConfig = () => {
   return { url, key, isValid: valid };
 };
 
-// Fetch server-side .env credentials on startup if available
-if (typeof window !== 'undefined') {
-  fetch('/api/get-supabase-env')
-    .then(res => res.json())
-    .then(data => {
-      if (data?.url && data?.key) {
-        const storedUrl = localStorage.getItem('sports_spectra_supabase_url');
-        const storedKey = localStorage.getItem('sports_spectra_supabase_anon_key');
-        if (!storedUrl || !storedKey) {
-          runtimeConfig.url = getCleanUrl(data.url);
-          runtimeConfig.key = data.key.trim();
-          localStorage.setItem('sports_spectra_supabase_url', runtimeConfig.url);
-          localStorage.setItem('sports_spectra_supabase_anon_key', runtimeConfig.key);
-          reinitSupabaseClient();
-          window.dispatchEvent(new CustomEvent('supabase-credentials-changed'));
-        }
-      }
-    })
-    .catch(() => {});
-}
 
 // Clean old mock bids or test artifacts
 if (typeof window !== 'undefined') {
@@ -647,14 +627,7 @@ export async function updateCustomSupabaseCredentials(url, key) {
     else localStorage.removeItem('sports_spectra_supabase_anon_key');
   }
 
-  // Persist to server .env
-  try {
-    await fetch('/api/save-supabase-env', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: cleanUrl, key: cleanKey })
-    });
-  } catch {}
+
 
   // Re-instantiate active client immediately
   reinitSupabaseClient();
@@ -668,6 +641,93 @@ export async function updateCustomSupabaseCredentials(url, key) {
 
   return { success: true };
 }
+
+// --- Security Utilities ---
+
+// Simple hash function for session tokens
+const hashString = (str) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return hash.toString(36);
+};
+
+export const createAdminSession = (password) => {
+  const timestamp = Date.now();
+  const token = `${timestamp}.${hashString(password + timestamp)}`;
+  sessionStorage.setItem('_ss4a_token', token);
+};
+
+export const validateAdminSession = () => {
+  const token = sessionStorage.getItem('_ss4a_token');
+  if (!token) return false;
+  
+  const expected = import.meta.env.VITE_ADMIN_PASSWORD || '';
+  if (!expected) return false;
+
+  const [timestampStr, hash] = token.split('.');
+  if (!timestampStr || !hash) return false;
+
+  const timestamp = parseInt(timestampStr, 10);
+  // Session expires after 12 hours
+  if (Date.now() - timestamp > 12 * 60 * 60 * 1000) {
+    sessionStorage.removeItem('_ss4a_token');
+    return false;
+  }
+
+  return hash === hashString(expected + timestampStr);
+};
+
+export const clearAdminSession = () => {
+  sessionStorage.removeItem('_ss4a_token');
+};
+
+// Rate limiting for login
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 5 * 60 * 1000; // 5 minutes
+
+export const checkLoginRateLimit = () => {
+  const attemptsData = JSON.parse(localStorage.getItem('_ss4a_attempts') || '{"count": 0, "lockedUntil": 0}');
+  
+  if (attemptsData.lockedUntil > Date.now()) {
+    return Math.ceil((attemptsData.lockedUntil - Date.now()) / 1000); // return seconds remaining
+  }
+  
+  // If lockout expired, reset
+  if (attemptsData.lockedUntil > 0 && attemptsData.lockedUntil <= Date.now()) {
+    localStorage.setItem('_ss4a_attempts', JSON.stringify({ count: 0, lockedUntil: 0 }));
+  }
+  return 0;
+};
+
+export const recordFailedLogin = () => {
+  const attemptsData = JSON.parse(localStorage.getItem('_ss4a_attempts') || '{"count": 0, "lockedUntil": 0}');
+  attemptsData.count += 1;
+  
+  if (attemptsData.count >= MAX_ATTEMPTS) {
+    attemptsData.lockedUntil = Date.now() + LOCKOUT_DURATION;
+  }
+  
+  localStorage.setItem('_ss4a_attempts', JSON.stringify(attemptsData));
+  return attemptsData.lockedUntil > 0 ? Math.ceil((attemptsData.lockedUntil - Date.now()) / 1000) : 0;
+};
+
+export const resetLoginAttempts = () => {
+  localStorage.setItem('_ss4a_attempts', JSON.stringify({ count: 0, lockedUntil: 0 }));
+};
+
+// CSV Injection prevention
+export const sanitizeCsvCell = (value) => {
+  if (value === null || value === undefined) return '';
+  let strValue = String(value);
+  if (/^[=+\-@\t\r]/.test(strValue)) {
+    return `'${strValue}`;
+  }
+  return strValue;
+};
 
 /**
  * Checks connection health to Supabase

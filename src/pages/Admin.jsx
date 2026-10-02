@@ -6,14 +6,33 @@ import {
   getLocalTeamBids, 
   getLocalTeams,
   saveLocalTeams,
-  getSupabaseConfig,
-  updateCustomSupabaseCredentials
+  updateCustomSupabaseCredentials,
+  validateAdminSession,
+  createAdminSession,
+  clearAdminSession,
+  checkLoginRateLimit,
+  recordFailedLogin,
+  resetLoginAttempts
 } from '../supabaseClient';
 
 function Admin() {
-    const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('adminAuth') === 'true');
+    const [isAuthenticated, setIsAuthenticated] = useState(() => validateAdminSession());
     const [passwordInput, setPasswordInput] = useState('');
     const [loginError, setLoginError] = useState(false);
+    const [lockoutTime, setLockoutTime] = useState(() => checkLoginRateLimit());
+
+    useEffect(() => {
+        let interval;
+        if (lockoutTime > 0) {
+            interval = setInterval(() => {
+                setLockoutTime((prev) => {
+                    if (prev <= 1) return 0;
+                    return prev - 1;
+                });
+            }, 1000);
+        }
+        return () => clearInterval(interval);
+    }, [lockoutTime]);
 
     // Database players & bids state
     const [masterPlayers, setMasterPlayers] = useState(() => {
@@ -200,19 +219,27 @@ function Admin() {
 
     const handleLogin = (e) => {
         e.preventDefault();
-        const expected = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
-        if (passwordInput === expected || passwordInput === 'admin' || passwordInput === 'admin123') {
+        
+        if (lockoutTime > 0) return;
+        
+        const expected = import.meta.env.VITE_ADMIN_PASSWORD || '';
+        if (passwordInput === expected && expected !== '') {
+            createAdminSession(expected);
             setIsAuthenticated(true);
-            sessionStorage.setItem('adminAuth', 'true');
             setLoginError(false);
+            resetLoginAttempts();
         } else {
+            const remainingLockout = recordFailedLogin();
+            if (remainingLockout > 0) {
+                setLockoutTime(remainingLockout);
+            }
             setLoginError(true);
             setPasswordInput('');
         }
     };
 
     const handleLogout = () => {
-        sessionStorage.removeItem('adminAuth');
+        clearAdminSession();
         setIsAuthenticated(false);
     };
 
@@ -437,10 +464,11 @@ function Admin() {
                                 className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-2xl p-4 text-center font-medium focus:outline-none transition`}
                                 required
                             />
-                            {loginError && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Default is "admin".</p>}
+                            {loginError && !lockoutTime && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Please try again.</p>}
+                            {lockoutTime > 0 && <p className="text-red-500 text-xs font-bold mt-2">Too many failed attempts. Locked out for {lockoutTime}s.</p>}
                         </div>
-                        <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg py-4 rounded-2xl transition shadow-lg shadow-orange-200 cursor-pointer">
-                            Unlock Auction Desk
+                        <button type="submit" disabled={lockoutTime > 0} className={`w-full text-white font-bold text-lg py-4 rounded-2xl transition shadow-lg cursor-pointer ${lockoutTime > 0 ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-200'}`}>
+                            {lockoutTime > 0 ? `Locked (${lockoutTime}s)` : 'Unlock Auction Desk'}
                         </button>
                     </form>
                 </div>

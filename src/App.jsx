@@ -13,9 +13,7 @@ function App() {
         <Route path="/doremon" element={<Admin />} />
         <Route path="/doremon/import-export" element={<DataImportExport />} />
         <Route path="/doremon/players" element={<DataImportExport />} />
-        <Route path="/admin" element={<Navigate to="/doremon" replace />} />
-        <Route path="/admin/import-export" element={<Navigate to="/doremon/import-export" replace />} />
-        <Route path="/admin/players" element={<Navigate to="/doremon/import-export" replace />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
