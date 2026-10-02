@@ -37,7 +37,32 @@ function Admin() {
     const [editPlayerId, setEditPlayerId] = useState(null);
 
     useEffect(() => {
-        setPlayers(JSON.parse(localStorage.getItem('auctionPlayers') || '[]'));
+        const loadPlayers = () => {
+            setPlayers(JSON.parse(localStorage.getItem('auctionPlayers') || '[]'));
+        };
+        loadPlayers();
+        window.addEventListener('storage', loadPlayers);
+
+        const fetchLivePlayers = async () => {
+            const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL || localStorage.getItem('appsScriptUrl');
+            if (appsScriptUrl) {
+                try {
+                    const res = await fetch(appsScriptUrl);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.success && data.players) {
+                            localStorage.setItem('auctionPlayers', JSON.stringify(data.players));
+                            setPlayers(data.players);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch live players from Google Sheets", e);
+                }
+            }
+        };
+        fetchLivePlayers();
+
+        return () => window.removeEventListener('storage', loadPlayers);
     }, []);
 
     // Close suggestions on outside click

@@ -65,10 +65,32 @@ function Auction() {
         
         // Polling fallback to guarantee updates even if storage event fails across same window/tabs
         const interval = setInterval(loadPlayers, 1000);
+
+        // Live fetch from Google Sheets
+        const fetchLivePlayers = async () => {
+            const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL || localStorage.getItem('appsScriptUrl');
+            if (appsScriptUrl) {
+                try {
+                    const res = await fetch(appsScriptUrl);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.success && data.players) {
+                            localStorage.setItem('auctionPlayers', JSON.stringify(data.players));
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch live players from Google Sheets", e);
+                }
+            }
+        };
+
+        fetchLivePlayers();
+        const liveInterval = setInterval(fetchLivePlayers, 10000); // Poll every 10 seconds
         
         return () => {
             window.removeEventListener('storage', loadPlayers);
             clearInterval(interval);
+            clearInterval(liveInterval);
         };
     }, []);
 
