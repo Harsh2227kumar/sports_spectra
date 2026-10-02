@@ -62,7 +62,18 @@ function Admin() {
         loadPlayers();
         window.addEventListener('storage', loadPlayers);
 
-        return () => window.removeEventListener('storage', loadPlayers);
+        // Subscribe to real-time updates from Supabase
+        const channel = supabase
+            .channel('admin_players_channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, (payload) => {
+                loadPlayers(); // Refresh data when changes occur
+            })
+            .subscribe();
+
+        return () => {
+            window.removeEventListener('storage', loadPlayers);
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const handleFileUpload = (e) => {
