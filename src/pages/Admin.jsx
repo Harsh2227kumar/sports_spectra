@@ -35,6 +35,7 @@ function Admin() {
 
     // Edit state
     const [editPlayerId, setEditPlayerId] = useState(null);
+    const [duplicateError, setDuplicateError] = useState(null);
 
     useEffect(() => {
         const loadPlayers = () => {
@@ -147,6 +148,7 @@ function Admin() {
 
     // Handle player name input change with autocomplete
     const handleNameChange = (e) => {
+        setDuplicateError(null);
         const value = e.target.value;
         setFormData(prev => ({ ...prev, playerName: value }));
 
@@ -178,6 +180,7 @@ function Admin() {
     };
 
     const handleChange = (e) => {
+        setDuplicateError(null);
         const { id, value } = e.target;
         setFormData(prev => ({ ...prev, [id]: value }));
     };
@@ -237,6 +240,13 @@ function Admin() {
                 syncToGoogleSheets(editedPlayer, 'edit');
             }
         } else {
+            // Check if player is already drafted
+            const alreadyDrafted = currentPlayers.find(p => p.name.toLowerCase() === formData.playerName.trim().toLowerCase());
+            if (alreadyDrafted) {
+                setDuplicateError(`Cannot add duplicate! ${formData.playerName} has already been drafted to ${alreadyDrafted.team}.`);
+                return;
+            }
+
             // Add new player
             const player = {
                 id: Date.now(),
@@ -498,6 +508,16 @@ function Admin() {
                             <input type="text" id="photoUrl" value={formData.photoUrl} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" placeholder="https://..." />
                         </div>
                     </div>
+
+                    {duplicateError && (
+                        <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 mt-4 rounded shadow-sm">
+                            <p className="font-bold text-sm">
+                                <i className="fa-solid fa-triangle-exclamation mr-2"></i>
+                                Error
+                            </p>
+                            <p className="text-sm mt-1">{duplicateError}</p>
+                        </div>
+                    )}
 
                     <button type="submit" className={`mt-4 ${editPlayerId ? 'bg-blue-500 hover:bg-blue-600' : 'bg-orange-500 hover:bg-orange-600'} text-white font-bold text-lg py-4 rounded-xl transition shadow-lg`}>
                         {editPlayerId ? "Update Player" : "Save Bid to Team"}
