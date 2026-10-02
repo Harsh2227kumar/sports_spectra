@@ -562,7 +562,6 @@ function Admin() {
                                     setEmailInput(e.target.value);
                                     setLoginError('');
                                 }}
-                                placeholder="e.g. admin@sports-spectra.com" 
                                 className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl p-3.5 text-sm font-medium focus:outline-none transition"
                                 required
                                 autoFocus
