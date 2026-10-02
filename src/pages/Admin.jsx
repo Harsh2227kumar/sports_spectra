@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import Papa from 'papaparse';
 
 function Admin() {
+    const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('adminAuth') === 'true');
+    const [passwordInput, setPasswordInput] = useState('');
+    const [loginError, setLoginError] = useState(false);
+
     const [players, setPlayers] = useState([]);
     const [showSuccess, setShowSuccess] = useState(false);
     
@@ -339,6 +343,53 @@ function Admin() {
     };
 
 
+
+    const handleLogin = (e) => {
+        e.preventDefault();
+        if (passwordInput === import.meta.env.VITE_ADMIN_PASSWORD) {
+            setIsAuthenticated(true);
+            sessionStorage.setItem('adminAuth', 'true');
+            setLoginError(false);
+        } else {
+            setLoginError(true);
+            setPasswordInput('');
+        }
+    };
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+                <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl max-w-md w-full text-center">
+                    <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6 text-orange-500 text-3xl shadow-inner">
+                        <i className="fa-solid fa-lock"></i>
+                    </div>
+                    <h1 className="text-3xl font-black text-gray-900 mb-2">Admin Access</h1>
+                    <p className="text-gray-500 text-sm mb-8">Enter the password to access the auction dashboard.</p>
+                    
+                    <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                        <div>
+                            <input 
+                                type="password" 
+                                value={passwordInput}
+                                onChange={(e) => {
+                                    setPasswordInput(e.target.value);
+                                    setLoginError(false);
+                                }}
+                                placeholder="Enter Password" 
+                                className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-xl p-4 text-center font-medium focus:outline-none transition`}
+                                required
+                                autoFocus
+                            />
+                            {loginError && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Please try again.</p>}
+                        </div>
+                        <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg py-4 rounded-xl transition shadow-lg shadow-orange-200 mt-2">
+                            Unlock Dashboard
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-6 md:p-12 text-gray-800">
