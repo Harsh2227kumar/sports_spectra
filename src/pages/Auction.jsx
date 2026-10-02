@@ -110,24 +110,24 @@ function Auction() {
         const cardBgImg = player.gender === 'M' ? '/boy_bg.png' : '/girl_bg.png';
         
         return (
-            <div className="bg-white rounded-[40px] p-10 shadow-xl shadow-gray-200/50 border border-white overflow-hidden relative group hover:shadow-2xl hover:shadow-orange-100 transition-all duration-300"
+            <div className="bg-white rounded-[24px] md:rounded-[40px] p-5 md:p-10 shadow-xl shadow-gray-200/50 border border-white overflow-hidden relative group hover:shadow-2xl hover:shadow-orange-100 transition-all duration-300"
                  style={{ background: `url('${cardBgImg}') no-repeat center center`, backgroundSize: 'cover' }}>
-                <div className={`absolute top-0 right-0 ${roleColor} text-white px-6 py-2 rounded-bl-3xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 z-10 shadow-sm`}>
+                <div className={`absolute top-0 right-0 ${roleColor} text-white px-3 md:px-6 py-1.5 md:py-2 rounded-bl-2xl md:rounded-bl-3xl text-[8px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 md:gap-2 z-10 shadow-sm`}>
                     <i className={`fa-solid ${roleIcon}`}></i> {roleTitle}
                 </div>
                 <div className="flex flex-col items-center relative z-10">
-                    <div className={`w-40 h-40 rounded-[32px] flex items-center justify-center text-5xl font-black ${initialColor} shadow-inner mb-8 group-hover:scale-105 transition-transform duration-300 border border-black/5 overflow-hidden`} style={{ backgroundColor: bgColor }}>
+                    <div className={`w-24 h-24 md:w-40 md:h-40 rounded-[20px] md:rounded-[32px] flex items-center justify-center text-3xl md:text-5xl font-black ${initialColor} shadow-inner mb-4 md:mb-8 group-hover:scale-105 transition-transform duration-300 border border-black/5 overflow-hidden`} style={{ backgroundColor: bgColor }}>
                         {player.photo ? (
                             <img src={player.photo} className="w-full h-full object-cover" alt={player.name} />
                         ) : (
                             player.initials
                         )}
                     </div>
-                    <h3 className="text-3xl font-black tracking-tighter text-center text-gray-900 leading-tight">{player.name}</h3>
-                    <p className="text-gray-400 font-bold uppercase text-[10px] mt-2 tracking-widest">{player.gender} &nbsp;|&nbsp; PLAYER</p>
-                    <div className="mt-8 bg-orange-50 border border-orange-100 px-8 py-2.5 rounded-full flex items-center gap-2 shadow-sm">
-                        <i className="fa-solid fa-circle-check text-orange-500"></i>
-                        <span className="text-orange-500 font-black text-xs uppercase tracking-widest">RETAINED</span>
+                    <h3 className="text-xl md:text-3xl font-black tracking-tighter text-center text-gray-900 leading-tight">{player.name}</h3>
+                    <p className="text-gray-400 font-bold uppercase text-[9px] md:text-[10px] mt-1 md:mt-2 tracking-widest">{player.gender} &nbsp;|&nbsp; PLAYER</p>
+                    <div className="mt-4 md:mt-8 bg-orange-50 border border-orange-100 px-4 md:px-8 py-2 md:py-2.5 rounded-full flex items-center gap-1.5 md:gap-2 shadow-sm">
+                        <i className="fa-solid fa-circle-check text-orange-500 text-xs md:text-sm"></i>
+                        <span className="text-orange-500 font-black text-[10px] md:text-xs uppercase tracking-widest">RETAINED</span>
                     </div>
                 </div>
             </div>
@@ -138,12 +138,12 @@ function Auction() {
         <div className="flex flex-col md:flex-row h-screen overflow-hidden">
             {/* SIDEBAR */}
             <aside className="flex flex-col md:flex-col shrink-0 w-full md:w-[260px] h-auto md:h-full z-20 shadow-lg md:shadow-none" style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover', transition: 'all 0.3s' }}>
-                <div className="p-4 md:p-8 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <div className="bg-orange-600 p-2 rounded-xl text-white">
+                <div className="p-3 md:p-8 flex justify-between items-center">
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="bg-orange-600 p-1.5 md:p-2 rounded-lg md:rounded-xl text-white text-sm md:text-base">
                             <i className="fa-solid fa-bolt-lightning"></i>
                         </div>
-                        <div className="hero-font text-white text-lg leading-none cursor-pointer" onClick={() => setActiveTeam(null)}>
+                        <div className="hero-font text-white text-sm md:text-lg leading-none cursor-pointer" onClick={() => setActiveTeam(null)}>
                             SPORTS<br /><span className="text-orange-500">SPECTRA 4.0</span>
                         </div>
                     </div>
@@ -289,19 +289,19 @@ function Auction() {
                         )}
                     </div>
                 ) : (
-                    <div className="p-10 flex-1 relative z-10">
+                    <div className="p-5 md:p-10 flex-1 relative z-10">
                         {/* LIVE AUCTION Title & Breadcrumbs */}
-                        <div className="flex justify-between items-center mb-8">
+                        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 md:mb-8">
                             <div>
                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Live Auction</p>
-                                <h2 className="hero-font text-4xl text-gray-900 tracking-tight">AUCTION <span className="text-orange-500">DASHBOARD</span></h2>
+                                <h2 className="hero-font text-2xl md:text-4xl text-gray-900 tracking-tight">AUCTION <span className="text-orange-500">DASHBOARD</span></h2>
                                 <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1 font-bold uppercase tracking-wider">
                                     <Link to="/" className="hover:text-orange-500 transition"><i className="fa-solid fa-house"></i></Link> / 
                                     <a onClick={() => setActiveTeam(null)} className="hover:text-orange-500 transition cursor-pointer">Teams</a> / 
                                     <span className="text-gray-900">{activeTeam}</span>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-6">
+                            <div className="hidden md:flex items-center gap-6">
                                 <div className="bg-white/90 backdrop-blur px-6 py-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow transition">
                                     <div className="text-orange-500"><i className="fa-solid fa-tower-broadcast animate-pulse"></i></div>
                                     <div className="text-right">
@@ -360,38 +360,38 @@ function Auction() {
                             return (
                                 <>
                                     {/* TEAM INFO & STATS */}
-                                    <div className="flex justify-between items-center mb-10 bg-orange-50/40 p-6 rounded-[24px] border border-orange-100/50 backdrop-blur-sm shadow-sm">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 bg-orange-50/40 p-4 md:p-6 rounded-[16px] md:rounded-[24px] border border-orange-100/50 backdrop-blur-sm shadow-sm gap-4">
                                         <div>
-                                            <h2 className="text-5xl font-black tracking-tighter text-gray-900">{activeTeam.toUpperCase()}</h2>
-                                            <p className="text-orange-500 font-black text-xs uppercase tracking-[0.2em] mt-2">{teamPlayers.length + 2} PLAYERS SQUAD</p>
+                                            <h2 className="text-3xl md:text-5xl font-black tracking-tighter text-gray-900">{activeTeam.toUpperCase()}</h2>
+                                            <p className="text-orange-500 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] mt-1 md:mt-2">{teamPlayers.length + 2} PLAYERS SQUAD</p>
                                         </div>
-                                        <div className="flex gap-4">
-                                            <div className="rounded-[20px] px-6 py-4 flex items-center gap-4 border border-black/5 bg-[#FFF0F5] shadow-sm">
-                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-pink-500 shadow-sm"><i className="fa-solid fa-user-group text-xl"></i></div>
-                                                <div>
-                                                    <p className="text-[10px] font-extrabold text-pink-400 uppercase tracking-widest">Girls Needed</p>
-                                                    <p className="text-3xl font-black text-pink-600 leading-none mt-1">{girlsRemaining}</p>
+                                        <div className="grid grid-cols-3 md:flex gap-2 md:gap-4 w-full md:w-auto">
+                                            <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-[#FFF0F5] shadow-sm">
+                                                <div className="w-8 h-8 md:w-12 md:h-12 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-pink-500 shadow-sm"><i className="fa-solid fa-user-group text-sm md:text-xl"></i></div>
+                                                <div className="text-center md:text-left">
+                                                    <p className="text-[8px] md:text-[10px] font-extrabold text-pink-400 uppercase tracking-widest">Girls</p>
+                                                    <p className="text-xl md:text-3xl font-black text-pink-600 leading-none mt-0.5">{girlsRemaining}</p>
                                                 </div>
                                             </div>
-                                            <div className="rounded-[20px] px-6 py-4 flex items-center gap-4 border border-black/5 bg-white shadow-sm">
-                                                <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-600 shadow-inner border border-gray-100"><i className="fa-solid fa-coins text-xl"></i></div>
-                                                <div>
-                                                    <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Total Spent</p>
-                                                    <p className="text-3xl font-black text-gray-900 leading-none mt-1">₹{totalSpent.toLocaleString('en-IN')}</p>
+                                            <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-white shadow-sm">
+                                                <div className="w-8 h-8 md:w-12 md:h-12 bg-gray-50 rounded-xl md:rounded-2xl flex items-center justify-center text-gray-600 shadow-inner border border-gray-100"><i className="fa-solid fa-coins text-sm md:text-xl"></i></div>
+                                                <div className="text-center md:text-left">
+                                                    <p className="text-[8px] md:text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Spent</p>
+                                                    <p className="text-lg md:text-3xl font-black text-gray-900 leading-none mt-0.5">₹{totalSpent.toLocaleString('en-IN')}</p>
                                                 </div>
                                             </div>
-                                            <div className="rounded-[20px] px-6 py-4 flex items-center gap-4 border border-black/5 bg-[#EBFCF5] shadow-sm">
-                                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><i className="fa-solid fa-money-bill-wave text-xl"></i></div>
-                                                <div>
-                                                    <p className="text-[10px] font-extrabold text-green-500 uppercase tracking-widest">Purse Left</p>
-                                                    <p className="text-3xl font-black text-green-600 leading-none mt-1">₹{purseLeft.toLocaleString('en-IN')}</p>
+                                            <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-[#EBFCF5] shadow-sm">
+                                                <div className="w-8 h-8 md:w-12 md:h-12 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><i className="fa-solid fa-money-bill-wave text-sm md:text-xl"></i></div>
+                                                <div className="text-center md:text-left">
+                                                    <p className="text-[8px] md:text-[10px] font-extrabold text-green-500 uppercase tracking-widest">Left</p>
+                                                    <p className="text-lg md:text-3xl font-black text-green-600 leading-none mt-0.5">₹{purseLeft.toLocaleString('en-IN')}</p>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* LEADERS SECTION */}
-                                    <div className="grid grid-cols-2 gap-8 mb-10">
+                                    <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-10">
                                         {renderLeaderCard(captainData, 'CAPTAIN', 'fa-crown', captainData.color)}
                                         {renderLeaderCard(viceCaptainData, 'VICE CAPTAIN', 'fa-star', viceCaptainData.color)}
                                     </div>
