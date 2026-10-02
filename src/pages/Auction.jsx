@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-const TOTAL_PURSE = 10000;
+const TOTAL_PURSE = 50000;
 const TEAMS = ['ONE EIGHT CHALLENGERS', 'TEAM 2', 'ASTRA', 'BRAVO', 'HELLFIRE', 'AUREX', 'TITANS', 'NEMESIS'];
 
 const HARDCODED_LEADERS = {
@@ -103,7 +103,6 @@ function Auction() {
                     photoUrl: p.photo_url
                 }));
                 setPlayers(mappedData);
-                localStorage.setItem('auctionPlayers', JSON.stringify(mappedData));
             }
 
             setIsPageLoading(false);
@@ -125,16 +124,8 @@ function Auction() {
             fetchSupabasePlayers(true);
         }, 5000);
 
-        // Local storage listener for manual changes in Admin tab (fallback)
-        const loadPlayers = () => {
-            const currentData = localStorage.getItem('auctionPlayers') || '[]';
-            setPlayers(JSON.parse(currentData));
-        };
-        window.addEventListener('storage', loadPlayers);
-
         return () => {
             clearInterval(pollInterval);
-            window.removeEventListener('storage', loadPlayers);
             supabase.removeChannel(subscription);
         };
     }, []);
