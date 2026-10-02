@@ -442,24 +442,6 @@ function Auction() {
                                 </span>
                             </button>
                         ))}
-
-                        <div className="px-6 mt-5 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
-                            Management
-                        </div>
-                        <Link 
-                            to="/doremon" 
-                            onClick={() => setMobileDrawerOpen(false)}
-                            className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-xs cursor-pointer"
-                        >
-                            <i className="fa-solid fa-gavel w-5 text-center text-orange-500"></i> Auction Bidding
-                        </Link>
-                        <Link 
-                            to="/doremon/import-export" 
-                            onClick={() => setMobileDrawerOpen(false)}
-                            className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-xs cursor-pointer"
-                        >
-                            <i className="fa-solid fa-file-import w-5 text-center text-orange-500"></i> Import & Export
-                        </Link>
                     </nav>
 
                     {/* Connection Status in Mobile Drawer */}
@@ -526,14 +508,6 @@ function Auction() {
                             </span>
                         </a>
                     ))}
-
-                    <div className="px-8 mt-6 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Management</div>
-                    <Link to="/doremon" className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-4 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-xs cursor-pointer">
-                        <i className="fa-solid fa-gavel w-5 text-center text-orange-500"></i> Auction Bidding
-                    </Link>
-                    <Link to="/doremon/import-export" className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-4 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-xs cursor-pointer">
-                        <i className="fa-solid fa-file-import w-5 text-center text-orange-500"></i> Import & Export
-                    </Link>
                 </nav>
 
                 {/* Connection Status in Sidebar */}
@@ -880,7 +854,6 @@ function Auction() {
                                                     <div className="text-center py-12 sm:py-16 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
                                                         <i className="fa-solid fa-users text-3xl sm:text-4xl text-gray-300 mb-3"></i>
                                                         <p className="text-gray-500 font-bold text-sm">No regular players drafted yet for {activeTeam}.</p>
-                                                        <p className="text-gray-400 text-xs mt-1">Go to the Auction Bidding desk in Admin Panel to draft players from the database.</p>
                                                     </div>
                                                 ) : (
                                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
