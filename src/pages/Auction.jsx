@@ -1,39 +1,62 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 const TOTAL_PURSE = 10000;
-const TEAMS = ['Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5', 'Team 6', 'Team 7', 'Team 8'];
+const TEAMS = ['ONE EIGHT CHALLENGERS', 'TEAM 2', 'ASTRA', 'BRAVO', 'HELLFIRE', 'AUREX', 'TITANS', 'NEMESIS'];
 
 const HARDCODED_LEADERS = {
-    'Team 1': { captain: { name: 'Atharva Anil Masharkar', gender: 'M', initials: 'AM', color: '#D6CFCB' }, viceCaptain: { name: 'SHRIYA YERANE', gender: 'F', initials: 'SY', color: '#2196F3' } },
-    'Team 2': { captain: { name: 'Chaitanya Kharpate', gender: 'M', initials: 'CK', color: '#FFB74D' }, viceCaptain: { name: 'Mahek Malkan', gender: 'F', initials: 'MM', color: '#BA68C8' } },
-    'Team 3': { captain: { name: 'Karan Deshmukh', gender: 'M', initials: 'KD', color: '#4DB6AC' }, viceCaptain: { name: 'Sejal Lende', gender: 'F', initials: 'SL', color: '#F06292' } },
-    'Team 4': { captain: { name: 'Ranvir Thakur', gender: 'M', initials: 'RT', color: '#7986CB' }, viceCaptain: { name: 'Radhika Sapate', gender: 'F', initials: 'RS', color: '#FF8A65' } },
-    'Team 5': { captain: { name: 'Arnav Sakharkar', gender: 'M', initials: 'AS', color: '#E65100' }, viceCaptain: { name: 'Ritisha Naigaonkar', gender: 'F', initials: 'RN', color: '#0277BD' } },
-    'Team 6': { captain: { name: 'Manthan Gujar', gender: 'M', initials: 'MG', color: '#D84315', photo: '/manthan.png' }, viceCaptain: { name: 'Aarya Raut', gender: 'F', initials: 'AR', color: '#C5E1A5' } },
-    'Team 7': { captain: { name: 'Parth tiwaskar', gender: 'M', initials: 'PT', color: '#A1887F' }, viceCaptain: { name: 'Janhavi Admane', gender: 'F', initials: 'JA', color: '#F48FB1' } },
-    'Team 8': { captain: { name: 'Shervin Peter', gender: 'M', initials: 'SP', color: '#90A4AE' }, viceCaptain: { name: 'Gauri Savale', gender: 'F', initials: 'GS', color: '#FFD54F' } }
+    'ONE EIGHT CHALLENGERS': { captain: { name: 'Atharva Anil Masharkar', gender: 'M', initials: 'AM', color: '#D6CFCB' }, viceCaptain: { name: 'Shriya Yerane', gender: 'F', initials: 'SY', color: '#2196F3' } },
+    'TEAM 2': { captain: { name: 'Chaitanya Kharpate', gender: 'M', initials: 'CK', color: '#FFB74D' }, viceCaptain: { name: 'Shrusti Kale', gender: 'F', initials: 'SK', color: '#BA68C8' } },
+    'ASTRA': { captain: { name: 'Karan Deshmukh', gender: 'M', initials: 'KD', color: '#4DB6AC' }, viceCaptain: { name: 'Sejal Lende', gender: 'F', initials: 'SL', color: '#F06292' } },
+    'BRAVO': { captain: { name: 'Ranvir Thakur', gender: 'M', initials: 'RT', color: '#7986CB' }, viceCaptain: { name: 'Radhika Sapate', gender: 'F', initials: 'RS', color: '#FF8A65' } },
+    'HELLFIRE': { captain: { name: 'Arnav Sakharkar', gender: 'M', initials: 'AS', color: '#E65100' }, viceCaptain: { name: 'Ritisha Naigaonkar', gender: 'F', initials: 'RN', color: '#0277BD' } },
+    'AUREX': { captain: { name: 'Manthan Gujar', gender: 'M', initials: 'MG', color: '#D84315', photo: '/manthan.png' }, viceCaptain: { name: 'Aarya Raut', gender: 'F', initials: 'AR', color: '#C5E1A5' } },
+    'TITANS': { captain: { name: 'Parth tiwaskar', gender: 'M', initials: 'PT', color: '#A1887F' }, viceCaptain: { name: 'Janhavi Admane', gender: 'F', initials: 'JA', color: '#F48FB1' } },
+    'NEMESIS': { captain: { name: 'Shervin Peter', gender: 'M', initials: 'SP', color: '#90A4AE' }, viceCaptain: { name: 'Gauri Savale', gender: 'F', initials: 'GS', color: '#FFD54F' } }
 };
 
 const TEAM_THEMES = {
-    'Team 1': { color: 'bg-orange-500', text: 'text-orange-500', from: 'from-orange-500', logo: '/logo1.png' },
-    'Team 2': { color: 'bg-blue-600', text: 'text-blue-600', from: 'from-blue-600', logo: '/logo2.png' },
-    'Team 3': { color: 'bg-red-600', text: 'text-red-600', from: 'from-red-600', logo: '/logo3.png' },
-    'Team 4': { color: 'bg-purple-600', text: 'text-purple-600', from: 'from-purple-600', logo: '/logo4.png' },
-    'Team 5': { color: 'bg-green-600', text: 'text-green-600', from: 'from-green-600', logo: '/logo5.png' },
-    'Team 6': { color: 'bg-yellow-600', text: 'text-yellow-600', from: 'from-yellow-600', logo: '/logo6.png' },
-    'Team 7': { color: 'bg-pink-600', text: 'text-pink-600', from: 'from-pink-600', logo: '/logo7.png' },
-    'Team 8': { color: 'bg-cyan-600', text: 'text-cyan-600', from: 'from-cyan-600', logo: '/logo8.png' }
+    'ONE EIGHT CHALLENGERS': { color: 'bg-orange-500', text: 'text-orange-500', from: 'from-orange-500', logo: '/logo1.png' },
+    'TEAM 2': { color: 'bg-blue-600', text: 'text-blue-600', from: 'from-blue-600', logo: '/logo2.png' },
+    'ASTRA': { color: 'bg-red-600', text: 'text-red-600', from: 'from-red-600', logo: '/logo3.png' },
+    'BRAVO': { color: 'bg-purple-600', text: 'text-purple-600', from: 'from-purple-600', logo: '/logo4.png' },
+    'HELLFIRE': { color: 'bg-green-600', text: 'text-green-600', from: 'from-green-600', logo: '/logo5.png' },
+    'AUREX': { color: 'bg-yellow-600', text: 'text-yellow-600', from: 'from-yellow-600', logo: '/logo6.png' },
+    'TITANS': { color: 'bg-pink-600', text: 'text-pink-600', from: 'from-pink-600', logo: '/logo7.png' },
+    'NEMESIS': { color: 'bg-cyan-600', text: 'text-cyan-600', from: 'from-cyan-600', logo: '/logo8.png' }
+};
+
+const TEAM_ALIAS_MAP = {
+    'team1': 'ONE EIGHT CHALLENGERS',
+    'oneeightchallengers': 'ONE EIGHT CHALLENGERS',
+    'team2': 'TEAM 2',
+    'team3': 'ASTRA',
+    'astra': 'ASTRA',
+    'team4': 'BRAVO',
+    'bravo': 'BRAVO',
+    'team5': 'HELLFIRE',
+    'hellfire': 'HELLFIRE',
+    'team6': 'AUREX',
+    'aurex': 'AUREX',
+    'team7': 'TITANS',
+    'titans': 'TITANS',
+    'team8': 'NEMESIS',
+    'nemesis': 'NEMESIS'
 };
 
 function getNormalizedTeam(teamName) {
-    return teamName.toLowerCase().replace(/\s+/g, '');
+    if (!teamName) return '';
+    const clean = teamName.toString().toLowerCase().replace(/\s+/g, '');
+    return TEAM_ALIAS_MAP[clean] || teamName.toString().trim().toUpperCase();
 }
 
 function Auction() {
-    const [activeTeam, setActiveTeam] = useState(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const teamParam = searchParams.get('team');
+    const activeTeam = TEAMS.find(t => getNormalizedTeam(t) === getNormalizedTeam(teamParam || '')) || null;
+
     const [players, setPlayers] = useState([]);
     const [isPageLoading, setIsPageLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -43,7 +66,14 @@ function Auction() {
     const handleTeamClick = (team) => {
         if (activeTeam === team) return;
         setIsTeamLoading(true);
-        setActiveTeam(team);
+        setSearchParams({ team });
+        setTimeout(() => setIsTeamLoading(false), 500);
+    };
+
+    const handleClearTeam = () => {
+        if (!activeTeam) return;
+        setIsTeamLoading(true);
+        setSearchParams({});
         setTimeout(() => setIsTeamLoading(false), 500);
     };
 
@@ -55,7 +85,7 @@ function Auction() {
             const { data, error } = await supabase
                 .from('players')
                 .select('*');
-            
+
             if (error) {
                 console.error("Error fetching from Supabase:", error);
             } else if (data) {
@@ -114,10 +144,10 @@ function Auction() {
         const isLightBg = ['#D6CFCB', '#FFB74D', '#F06292', '#FF8A65', '#C5E1A5', '#FFD54F', '#A1887F', '#90A4AE'].includes(bgColor);
         const initialColor = isLightBg ? 'text-gray-900' : 'text-white';
         const cardBgImg = player.gender === 'M' ? '/boy_bg.png' : '/girl_bg.png';
-        
+
         return (
             <div className="bg-white rounded-[24px] md:rounded-[40px] p-5 md:p-10 shadow-xl shadow-gray-200/50 border border-white overflow-hidden relative group hover:shadow-2xl hover:shadow-orange-100 transition-all duration-300"
-                 style={{ background: `url('${cardBgImg}') no-repeat center center`, backgroundSize: 'cover' }}>
+                style={{ background: `url('${cardBgImg}') no-repeat center center`, backgroundSize: 'cover' }}>
                 <div className={`absolute top-0 right-0 ${roleColor} text-white px-3 md:px-6 py-1.5 md:py-2 rounded-bl-2xl md:rounded-bl-3xl text-[8px] md:text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 md:gap-2 z-10 shadow-sm`}>
                     <i className={`fa-solid ${roleIcon}`}></i> {roleTitle}
                 </div>
@@ -149,15 +179,15 @@ function Auction() {
                         <div className="bg-orange-600 p-1.5 md:p-2 rounded-lg md:rounded-xl text-white text-sm md:text-base">
                             <i className="fa-solid fa-bolt-lightning"></i>
                         </div>
-                        <div className="hero-font text-white text-sm md:text-lg leading-none cursor-pointer" onClick={() => setActiveTeam(null)}>
+                        <div className="hero-font text-white text-sm md:text-lg leading-none cursor-pointer" onClick={handleClearTeam}>
                             SPORTS<br /><span className="text-orange-500">SPECTRA 4.0</span>
                         </div>
                     </div>
                 </div>
-                
+
                 <nav className="flex-1 px-2 md:px-0 mt-0 md:mt-4 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto no-scrollbar items-center md:items-stretch border-t border-white/5 md:border-none" onMouseLeave={() => setHoveredTeam(null)}>
                     {activeTeam ? (
-                        <a onClick={() => setActiveTeam(null)} className="shrink-0 text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-2 md:mx-4 my-2 md:my-1 px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 font-semibold text-xs md:text-sm cursor-pointer">
+                        <a onClick={handleClearTeam} className="shrink-0 text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-2 md:mx-4 my-2 md:my-1 px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 font-semibold text-xs md:text-sm cursor-pointer">
                             <i className="fa-solid fa-house-chimney w-4 md:w-5 text-center"></i> <span className="hidden md:inline">Dashboard</span>
                         </a>
                     ) : (
@@ -166,10 +196,10 @@ function Auction() {
                         </Link>
                     )}
                     <div className="hidden md:block px-8 mt-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Franchises</div>
-                    
+
                     {TEAMS.map(team => (
                         <a key={team} onClick={() => handleTeamClick(team)} onMouseEnter={() => setHoveredTeam(team)}
-                           className={`shrink-0 relative block text-[#9CA3AF] hover:text-white transition-colors rounded-xl mx-1 md:mx-4 my-2 md:my-1 px-3 md:px-4 py-2 md:py-3 cursor-pointer group ${(hoveredTeam || activeTeam) === team ? '!text-white' : ''}`}>
+                            className={`shrink-0 relative block text-[#9CA3AF] hover:text-white transition-colors rounded-xl mx-1 md:mx-4 my-2 md:my-1 px-3 md:px-4 py-2 md:py-3 cursor-pointer group ${(hoveredTeam || activeTeam) === team ? '!text-white' : ''}`}>
                             {(hoveredTeam || activeTeam) === team && (
                                 <motion.div
                                     layoutId="navIndicator"
@@ -188,7 +218,7 @@ function Auction() {
 
             {/* MAIN CONTENT AREA */}
             <main className="flex-1 flex flex-col overflow-y-auto relative" style={{ background: "url('/bg.png') no-repeat center center fixed", backgroundSize: 'cover' }}>
-                
+
                 {!activeTeam ? (
                     <div className="p-6 md:p-10 flex-1 relative z-10">
                         <div className="mb-8 md:mb-12">
@@ -212,7 +242,7 @@ function Auction() {
                         </div>
                         {isPageLoading ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
-                                {[1,2,3,4,5,6,7,8].map(i => (
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
                                     <div key={i} className="bg-white rounded-[24px] p-6 border border-gray-100 relative h-[260px]">
                                         <div className="animate-pulse flex flex-col h-full justify-between">
                                             <div className="flex items-center gap-4 mt-2">
@@ -248,15 +278,15 @@ function Auction() {
                                     const purseLeft = TOTAL_PURSE - totalSpent;
                                     const percentUsed = Math.min(100, Math.round((totalSpent / TOTAL_PURSE) * 100));
                                     const theme = TEAM_THEMES[team] || { color: 'bg-gray-500', text: 'text-gray-500', from: 'from-gray-500', icon: 'fa-shield' };
-                                    
+
                                     return (
                                         <div key={team} onClick={() => handleTeamClick(team)}
-                                             className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group">
-                                            
-                                        {/* Faint watermark on the right */}
-                                        <div className={`absolute -bottom-4 -right-4 w-40 h-40 opacity-[0.04] group-hover:scale-110 group-hover:opacity-[0.08] transition-all pointer-events-none grayscale`}>
-                                            <img src={theme.logo} className="w-full h-full object-contain" alt="" />
-                                        </div>
+                                            className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group">
+
+                                            {/* Faint watermark on the right */}
+                                            <div className={`absolute -bottom-4 -right-4 w-40 h-40 opacity-[0.04] group-hover:scale-110 group-hover:opacity-[0.08] transition-all pointer-events-none grayscale`}>
+                                                <img src={theme.logo} className="w-full h-full object-contain" alt="" />
+                                            </div>
 
                                             {/* Chevron icon top right */}
                                             <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-gray-100 transition-colors shadow-sm">
@@ -281,7 +311,7 @@ function Auction() {
                                                     <p className="text-xl font-black text-gray-900 leading-none">₹{totalSpent.toLocaleString('en-IN')}</p>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="mt-5 relative z-10 pt-4 border-t border-gray-50">
                                                 <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
                                                     <div className={`h-full ${theme.color} rounded-full`} style={{ width: `${percentUsed}%` }}></div>
@@ -302,8 +332,8 @@ function Auction() {
                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Live Auction</p>
                                 <h2 className="hero-font text-2xl md:text-4xl text-gray-900 tracking-tight">AUCTION <span className="text-orange-500">DASHBOARD</span></h2>
                                 <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1 font-bold uppercase tracking-wider">
-                                    <Link to="/" className="hover:text-orange-500 transition"><i className="fa-solid fa-house"></i></Link> / 
-                                    <a onClick={() => setActiveTeam(null)} className="hover:text-orange-500 transition cursor-pointer">Teams</a> / 
+                                    <Link to="/" className="hover:text-orange-500 transition"><i className="fa-solid fa-house"></i></Link> /
+                                    <a onClick={handleClearTeam} className="hover:text-orange-500 transition cursor-pointer">Teams</a> /
                                     <span className="text-gray-900">{activeTeam}</span>
                                 </div>
                             </div>
@@ -353,100 +383,100 @@ function Auction() {
                         ) : (
                             <div className="max-w-7xl mx-auto w-full">
                                 {(() => {
-                            const teamPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(activeTeam));
-                            const captainData = HARDCODED_LEADERS[activeTeam].captain;
-                            const viceCaptainData = HARDCODED_LEADERS[activeTeam].viceCaptain;
-                            const regulars = teamPlayers.filter(p => p.role === 'Player');
-                            
-                            const totalGirls = (captainData.gender === 'F' ? 1 : 0) + (viceCaptainData.gender === 'F' ? 1 : 0) + regulars.filter(p => p.gender === 'F').length;
-                            const girlsRemaining = Math.max(0, 15 - totalGirls);
-                            const totalSpent = teamPlayers.reduce((sum, p) => sum + Number(p.bidAmount), 0);
-                            const purseLeft = TOTAL_PURSE - totalSpent;
+                                    const teamPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(activeTeam));
+                                    const captainData = HARDCODED_LEADERS[activeTeam].captain;
+                                    const viceCaptainData = HARDCODED_LEADERS[activeTeam].viceCaptain;
+                                    const regulars = teamPlayers.filter(p => p.role === 'Player');
 
-                            return (
-                                <>
-                                    {/* TEAM INFO & STATS */}
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 bg-orange-50/40 p-4 md:p-6 rounded-[16px] md:rounded-[24px] border border-orange-100/50 backdrop-blur-sm shadow-sm gap-4">
-                                        <div>
-                                            <h2 className="text-3xl md:text-5xl font-black tracking-tighter text-gray-900">{activeTeam.toUpperCase()}</h2>
-                                            <p className="text-orange-500 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] mt-1 md:mt-2">{teamPlayers.length + 2} PLAYERS SQUAD</p>
-                                        </div>
-                                        <div className="grid grid-cols-3 md:flex gap-2 md:gap-4 w-full md:w-auto">
-                                            <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-[#FFF0F5] shadow-sm">
-                                                <div className="w-8 h-8 md:w-12 md:h-12 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-pink-500 shadow-sm"><i className="fa-solid fa-user-group text-sm md:text-xl"></i></div>
-                                                <div className="text-center md:text-left">
-                                                    <p className="text-[8px] md:text-[10px] font-extrabold text-pink-400 uppercase tracking-widest">Girls</p>
-                                                    <p className="text-xl md:text-3xl font-black text-pink-600 leading-none mt-0.5">{girlsRemaining}</p>
+                                    const totalGirls = (captainData.gender === 'F' ? 1 : 0) + (viceCaptainData.gender === 'F' ? 1 : 0) + regulars.filter(p => p.gender === 'F').length;
+                                    const girlsRemaining = Math.max(0, 15 - totalGirls);
+                                    const totalSpent = teamPlayers.reduce((sum, p) => sum + Number(p.bidAmount), 0);
+                                    const purseLeft = TOTAL_PURSE - totalSpent;
+
+                                    return (
+                                        <>
+                                            {/* TEAM INFO & STATS */}
+                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-10 bg-orange-50/40 p-4 md:p-6 rounded-[16px] md:rounded-[24px] border border-orange-100/50 backdrop-blur-sm shadow-sm gap-4">
+                                                <div>
+                                                    <h2 className="text-3xl md:text-5xl font-black tracking-tighter text-gray-900">{activeTeam.toUpperCase()}</h2>
+                                                    <p className="text-orange-500 font-black text-[10px] md:text-xs uppercase tracking-[0.2em] mt-1 md:mt-2">{teamPlayers.length + 2} PLAYERS SQUAD</p>
+                                                </div>
+                                                <div className="grid grid-cols-3 md:flex gap-2 md:gap-4 w-full md:w-auto">
+                                                    <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-[#FFF0F5] shadow-sm">
+                                                        <div className="w-8 h-8 md:w-12 md:h-12 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-pink-500 shadow-sm"><i className="fa-solid fa-user-group text-sm md:text-xl"></i></div>
+                                                        <div className="text-center md:text-left">
+                                                            <p className="text-[8px] md:text-[10px] font-extrabold text-pink-400 uppercase tracking-widest">Girls</p>
+                                                            <p className="text-xl md:text-3xl font-black text-pink-600 leading-none mt-0.5">{girlsRemaining}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-white shadow-sm">
+                                                        <div className="w-8 h-8 md:w-12 md:h-12 bg-gray-50 rounded-xl md:rounded-2xl flex items-center justify-center text-gray-600 shadow-inner border border-gray-100"><i className="fa-solid fa-coins text-sm md:text-xl"></i></div>
+                                                        <div className="text-center md:text-left">
+                                                            <p className="text-[8px] md:text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Spent</p>
+                                                            <p className="text-lg md:text-3xl font-black text-gray-900 leading-none mt-0.5">₹{totalSpent.toLocaleString('en-IN')}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-[#EBFCF5] shadow-sm">
+                                                        <div className="w-8 h-8 md:w-12 md:h-12 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><i className="fa-solid fa-money-bill-wave text-sm md:text-xl"></i></div>
+                                                        <div className="text-center md:text-left">
+                                                            <p className="text-[8px] md:text-[10px] font-extrabold text-green-500 uppercase tracking-widest">Left</p>
+                                                            <p className="text-lg md:text-3xl font-black text-green-600 leading-none mt-0.5">₹{purseLeft.toLocaleString('en-IN')}</p>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-white shadow-sm">
-                                                <div className="w-8 h-8 md:w-12 md:h-12 bg-gray-50 rounded-xl md:rounded-2xl flex items-center justify-center text-gray-600 shadow-inner border border-gray-100"><i className="fa-solid fa-coins text-sm md:text-xl"></i></div>
-                                                <div className="text-center md:text-left">
-                                                    <p className="text-[8px] md:text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Spent</p>
-                                                    <p className="text-lg md:text-3xl font-black text-gray-900 leading-none mt-0.5">₹{totalSpent.toLocaleString('en-IN')}</p>
+
+                                            {/* LEADERS SECTION */}
+                                            <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-10">
+                                                {renderLeaderCard(captainData, 'CAPTAIN', 'fa-crown', captainData.color)}
+                                                {renderLeaderCard(viceCaptainData, 'VICE CAPTAIN', 'fa-star', viceCaptainData.color)}
+                                            </div>
+
+                                            {/* PLAYERS TABLE */}
+                                            <div className="bg-white/90 backdrop-blur-md rounded-3xl border border-gray-100 overflow-hidden shadow-xl shadow-gray-200/50">
+                                                <div className="p-6 border-b border-gray-100 bg-white/50 flex items-center justify-between">
+                                                    <h3 className="font-bold text-lg text-gray-900"><i className="fa-solid fa-users text-orange-500 mr-2"></i> Squad Members</h3>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-sm">
+                                                        <thead className="text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50/80">
+                                                            <tr>
+                                                                <th className="px-8 py-5 font-bold">Player</th>
+                                                                <th className="px-8 py-5 font-bold">Gender</th>
+                                                                <th className="px-8 py-5 font-bold">Yr / Sec</th>
+                                                                <th className="px-8 py-5 font-bold">Sports</th>
+                                                                <th className="px-8 py-5 font-bold text-right">Bid (₹)</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100/80">
+                                                            {regulars.length === 0 ? (
+                                                                <tr><td colSpan="5" className="px-8 py-16 text-center text-gray-400 font-medium bg-gray-50/30">No other players drafted yet.</td></tr>
+                                                            ) : (
+                                                                regulars.map((p, idx) => {
+                                                                    const avatar = p.photoUrl || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name) + '&background=random');
+                                                                    return (
+                                                                        <tr key={idx} className="hover:bg-orange-50/50 transition-colors group cursor-default">
+                                                                            <td className="px-8 py-4 whitespace-nowrap">
+                                                                                <div className="flex items-center gap-4">
+                                                                                    <img src={avatar} className="w-10 h-10 rounded-full bg-gray-200 object-cover shadow-sm group-hover:scale-110 transition-transform" />
+                                                                                    <span className="font-bold text-gray-900">{p.name}</span>
+                                                                                </div>
+                                                                            </td>
+                                                                            <td className="px-8 py-4 text-gray-500 font-semibold">{p.gender}</td>
+                                                                            <td className="px-8 py-4 text-gray-500 font-semibold">{p.year} / {p.section}</td>
+                                                                            <td className="px-8 py-4 text-gray-500 text-xs font-medium uppercase tracking-wider">{p.sports}</td>
+                                                                            <td className="px-8 py-4 font-black text-orange-500 text-right text-base">₹{Number(p.bidAmount).toLocaleString('en-IN')}</td>
+                                                                        </tr>
+                                                                    );
+                                                                })
+                                                            )}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             </div>
-                                            <div className="rounded-xl md:rounded-[20px] px-3 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-4 border border-black/5 bg-[#EBFCF5] shadow-sm">
-                                                <div className="w-8 h-8 md:w-12 md:h-12 bg-white rounded-xl md:rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><i className="fa-solid fa-money-bill-wave text-sm md:text-xl"></i></div>
-                                                <div className="text-center md:text-left">
-                                                    <p className="text-[8px] md:text-[10px] font-extrabold text-green-500 uppercase tracking-widest">Left</p>
-                                                    <p className="text-lg md:text-3xl font-black text-green-600 leading-none mt-0.5">₹{purseLeft.toLocaleString('en-IN')}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* LEADERS SECTION */}
-                                    <div className="grid grid-cols-2 gap-4 md:gap-8 mb-6 md:mb-10">
-                                        {renderLeaderCard(captainData, 'CAPTAIN', 'fa-crown', captainData.color)}
-                                        {renderLeaderCard(viceCaptainData, 'VICE CAPTAIN', 'fa-star', viceCaptainData.color)}
-                                    </div>
-
-                                    {/* PLAYERS TABLE */}
-                                    <div className="bg-white/90 backdrop-blur-md rounded-3xl border border-gray-100 overflow-hidden shadow-xl shadow-gray-200/50">
-                                        <div className="p-6 border-b border-gray-100 bg-white/50 flex items-center justify-between">
-                                            <h3 className="font-bold text-lg text-gray-900"><i className="fa-solid fa-users text-orange-500 mr-2"></i> Squad Members</h3>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left text-sm">
-                                                <thead className="text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50/80">
-                                                    <tr>
-                                                        <th className="px-8 py-5 font-bold">Player</th>
-                                                        <th className="px-8 py-5 font-bold">Gender</th>
-                                                        <th className="px-8 py-5 font-bold">Yr / Sec</th>
-                                                        <th className="px-8 py-5 font-bold">Sports</th>
-                                                        <th className="px-8 py-5 font-bold text-right">Bid (₹)</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-100/80">
-                                                    {regulars.length === 0 ? (
-                                                        <tr><td colSpan="5" className="px-8 py-16 text-center text-gray-400 font-medium bg-gray-50/30">No other players drafted yet.</td></tr>
-                                                    ) : (
-                                                        regulars.map((p, idx) => {
-                                                            const avatar = p.photoUrl || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name) + '&background=random');
-                                                            return (
-                                                                <tr key={idx} className="hover:bg-orange-50/50 transition-colors group cursor-default">
-                                                                    <td className="px-8 py-4 whitespace-nowrap">
-                                                                        <div className="flex items-center gap-4">
-                                                                            <img src={avatar} className="w-10 h-10 rounded-full bg-gray-200 object-cover shadow-sm group-hover:scale-110 transition-transform" />
-                                                                            <span className="font-bold text-gray-900">{p.name}</span>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="px-8 py-4 text-gray-500 font-semibold">{p.gender}</td>
-                                                                    <td className="px-8 py-4 text-gray-500 font-semibold">{p.year} / {p.section}</td>
-                                                                    <td className="px-8 py-4 text-gray-500 text-xs font-medium uppercase tracking-wider">{p.sports}</td>
-                                                                    <td className="px-8 py-4 font-black text-orange-500 text-right text-base">₹{Number(p.bidAmount).toLocaleString('en-IN')}</td>
-                                                                </tr>
-                                                            );
-                                                        })
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </>
-                            );
-                        })()}
+                                        </>
+                                    );
+                                })()}
                             </div>
                         )}
                     </div>

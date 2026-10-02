@@ -18,7 +18,7 @@ function Admin() {
     
     // Form state
     const [formData, setFormData] = useState({
-        team: 'TEAM 1',
+        team: 'ONE EIGHT CHALLENGERS',
         role: 'Player',
         playerName: '',
         gender: 'M',
@@ -459,8 +459,8 @@ function Admin() {
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Team</label>
                             <select id="team" value={formData.team} onChange={handleChange} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500" required>
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
-                                    <option key={num} value={`TEAM ${num}`}>TEAM {num}</option>
+                                {['ONE EIGHT CHALLENGERS', 'TEAM 2', 'ASTRA', 'BRAVO', 'HELLFIRE', 'AUREX', 'TITANS', 'NEMESIS'].map(teamName => (
+                                    <option key={teamName} value={teamName}>{teamName}</option>
                                 ))}
                             </select>
                         </div>
@@ -574,7 +574,7 @@ function Admin() {
                     {editPlayerId && (
                         <button type="button" onClick={() => {
                             setEditPlayerId(null);
-                            setFormData({ team: 'TEAM 1', role: 'Player', playerName: '', gender: 'M', year: '', section: '', sports: '', bidAmount: '', photoUrl: '' });
+                            setFormData({ team: 'ONE EIGHT CHALLENGERS', role: 'Player', playerName: '', gender: 'M', year: '', section: '', sports: '', bidAmount: '', photoUrl: '' });
                         }} className="mt-2 text-gray-500 font-bold text-sm hover:text-gray-700 transition">Cancel Edit</button>
                     )}
                     {showSuccess && <p className="text-green-600 font-bold text-center text-sm mt-2">Player added successfully!</p>}
