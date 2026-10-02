@@ -16,9 +16,12 @@ const getFormattedTimestamp = () => {
 };
 
 function Admin() {
-    const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('adminAuth') === 'true');
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [emailInput, setEmailInput] = useState('');
     const [passwordInput, setPasswordInput] = useState('');
-    const [loginError, setLoginError] = useState(false);
+    const [loginError, setLoginError] = useState('');
+    const [isAuthenticating, setIsAuthenticating] = useState(false);
+    const [currentUserEmail, setCurrentUserEmail] = useState('');
 
     const [players, setPlayers] = useState([]);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -27,7 +30,7 @@ function Admin() {
     const [adminLogs, setAdminLogs] = useState([]);
     const [eventLogs, setEventLogs] = useState([]);
 
-    const [activeLogTab, setActiveLogTab] = useState('events'); // 'events' | 'admin'
+    const [activeLogTab, setActiveLogTab] = useState('events');
     const [logSearchQuery, setLogSearchQuery] = useState('');
 
     // Autocomplete state
@@ -61,7 +64,7 @@ function Admin() {
             timestamp: formattedTime,
             action,
             details,
-            user: 'Admin'
+            user: currentUserEmail || 'Admin'
         };
         setAdminLogs(prev => [tempLog, ...prev]);
 
@@ -69,7 +72,7 @@ function Admin() {
             await supabase.from('admin_logs').insert([{
                 action,
                 details,
-                user_name: 'Admin'
+                user_name: currentUserEmail || 'Admin'
             }]);
         } catch (err) {
             console.error("Supabase Admin Log Sync Error:", err);
@@ -159,10 +162,30 @@ function Admin() {
     };
 
     useEffect(() => {
-        loadPlayers();
-        loadLogs();
+        // Initial Supabase Session Verification
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                setIsAuthenticated(true);
+                setCurrentUserEmail(session.user?.email || 'Admin');
+                loadPlayers();
+                loadLogs();
+            }
+        });
 
-        // Subscribe to real-time updates from Supabase tables
+        // Supabase Auth Listener
+        const { data: { subscription: authListener } } = supabase.auth.onAuthStateChange((_event, session) => {
+            if (session) {
+                setIsAuthenticated(true);
+                setCurrentUserEmail(session.user?.email || 'Admin');
+                loadPlayers();
+                loadLogs();
+            } else {
+                setIsAuthenticated(false);
+                setCurrentUserEmail('');
+            }
+        });
+
+        // Supabase Realtime Channels
         const playersChannel = supabase
             .channel('admin_players_live')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => {
@@ -187,12 +210,15 @@ function Admin() {
 
         return () => {
             clearInterval(pollInterval);
+            authListener?.unsubscribe();
             supabase.removeChannel(playersChannel);
             supabase.removeChannel(logsChannel);
         };
     }, []);
 
     const handleFileUpload = (e) => {
+        if (!isAuthenticated) return;
+
         const file = e.target.files[0];
         if (!file) return;
 
@@ -252,7 +278,6 @@ function Admin() {
                     const ignoreMsg = ignoredCount > 0 ? ` (${ignoredCount} duplicates ignored)` : '';
                     alert(`Successfully imported ${uniqueNewPlayers.length} new players to Supabase!${ignoreMsg}`);
                     
-                    // Log events directly to Supabase
                     addAdminLog('CSV_UPLOAD', `Uploaded CSV file with ${uniqueNewPlayers.length} new players`);
                     addEventLog('BULK_IMPORT', 'CSV Upload', `Imported ${uniqueNewPlayers.length} new players to database as UNSOLD`, 'UNSOLD', 0, `CSV Import: ${uniqueNewPlayers.length} players inserted (${ignoredCount} duplicates skipped)`);
 
@@ -309,6 +334,7 @@ function Admin() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!isAuthenticated) return;
         
         const existingPlayer = players.find(p => p.name.toLowerCase() === formData.playerName.trim().toLowerCase());
         const isUpdate = editPlayerId || (existingPlayer && existingPlayer.team === 'UNSOLD');
@@ -386,6 +412,8 @@ function Admin() {
     };
 
     const handleEdit = (player) => {
+        if (!isAuthenticated) return;
+
         setFormData({
             team: player.team,
             role: player.role,
@@ -402,6 +430,8 @@ function Admin() {
     };
 
     const handleDelete = async (playerId) => {
+        if (!isAuthenticated) return;
+
         if (window.confirm("Are you sure you want to remove this player from Supabase?")) {
             const playerToDelete = players.find(p => p.id === playerId);
             if (playerToDelete) {
@@ -419,9 +449,10 @@ function Admin() {
     };
 
     const clearData = async () => {
+        if (!isAuthenticated) return;
+
         if (window.confirm("Are you sure you want to reset all drafted players in Supabase?")) {
             try {
-                // Update drafted players back to UNSOLD or delete them
                 const { error } = await supabase.from('players').update({ team: 'UNSTAGE_CLEAR', bid_amount: 0 }).neq('team', 'UNSOLD');
                 if (error) {
                     await supabase.from('players').delete().neq('name', '___NON_EXISTENT___');
@@ -436,27 +467,45 @@ function Admin() {
         }
     };
 
-    const handleLogin = (e) => {
+    // Server-Side Authentication via Supabase Auth
+    const handleLogin = async (e) => {
         e.preventDefault();
-        if (passwordInput === import.meta.env.VITE_ADMIN_PASSWORD) {
-            setIsAuthenticated(true);
-            sessionStorage.setItem('adminAuth', 'true');
-            setLoginError(false);
-            addAdminLog('LOGIN', 'Admin authenticated and logged in successfully');
-            addEventLog('LOGIN', 'Admin', 'Admin logged into control panel', 'N/A', 0, 'Admin session authenticated successfully');
-        } else {
-            setLoginError(true);
-            setPasswordInput('');
+        setLoginError('');
+        setIsAuthenticating(true);
+
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: emailInput.trim(),
+                password: passwordInput
+            });
+
+            if (error) {
+                setLoginError(error.message);
+            } else if (data?.session) {
+                setIsAuthenticated(true);
+                setCurrentUserEmail(data.user?.email || 'Admin');
+                setEmailInput('');
+                setPasswordInput('');
+                addAdminLog('LOGIN', `Admin authenticated via Supabase Server Auth (${data.user?.email})`);
+                addEventLog('LOGIN', 'Admin', 'Admin logged into control panel', 'N/A', 0, `Authenticated session for ${data.user?.email}`);
+            }
+        } catch (err) {
+            setLoginError("Authentication failed. Please check credentials.");
+        } finally {
+            setIsAuthenticating(false);
         }
     };
 
-    const handleLogout = () => {
-        addAdminLog('LOGOUT', 'Admin logged out');
-        sessionStorage.removeItem('adminAuth');
+    const handleLogout = async () => {
+        addAdminLog('LOGOUT', `Admin logged out (${currentUserEmail})`);
+        await supabase.auth.signOut();
         setIsAuthenticated(false);
+        setCurrentUserEmail('');
     };
 
     const clearAdminLogs = async () => {
+        if (!isAuthenticated) return;
+
         if (window.confirm("Are you sure you want to clear all admin logs in Supabase?")) {
             try {
                 await supabase.from('admin_logs').delete().neq('id', 0);
@@ -466,6 +515,8 @@ function Admin() {
     };
 
     const clearEventLogs = async () => {
+        if (!isAuthenticated) return;
+
         if (window.confirm("Are you sure you want to clear all event logs in Supabase?")) {
             try {
                 await supabase.from('event_logs').delete().neq('id', 0);
@@ -490,34 +541,65 @@ function Admin() {
         document.body.removeChild(link);
     };
 
+    // Render Login Screen if not authenticated with Supabase Auth
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-                <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl max-w-md w-full text-center border border-gray-100">
+                <div className="bg-white p-8 md:p-12 rounded-3xl shadow-xl max-w-md w-full border border-gray-100">
                     <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6 text-orange-500 text-3xl shadow-inner">
                         <i className="fa-solid fa-shield-halved"></i>
                     </div>
-                    <h1 className="text-3xl font-black text-gray-900 mb-2">Admin Access</h1>
-                    <p className="text-gray-500 text-sm mb-8">Enter the master password to access auction controls & Supabase logs.</p>
+                    <h1 className="text-3xl font-black text-gray-900 text-center mb-2">Admin Login</h1>
+                    <p className="text-gray-500 text-sm text-center mb-8">Authenticate with your Supabase server credentials.</p>
                     
                     <form onSubmit={handleLogin} className="flex flex-col gap-4">
                         <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Email</label>
+                            <input 
+                                type="email" 
+                                value={emailInput}
+                                onChange={(e) => {
+                                    setEmailInput(e.target.value);
+                                    setLoginError('');
+                                }}
+                                placeholder="e.g. admin@sports-spectra.com" 
+                                className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl p-3.5 text-sm font-medium focus:outline-none transition"
+                                required
+                                autoFocus
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Password</label>
                             <input 
                                 type="password" 
                                 value={passwordInput}
                                 onChange={(e) => {
                                     setPasswordInput(e.target.value);
-                                    setLoginError(false);
+                                    setLoginError('');
                                 }}
                                 placeholder="Enter Admin Password" 
-                                className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-xl p-4 text-center font-medium focus:outline-none transition`}
+                                className="w-full bg-gray-50 border border-gray-200 focus:border-orange-500 rounded-xl p-3.5 text-sm font-medium focus:outline-none transition"
                                 required
-                                autoFocus
                             />
-                            {loginError && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Please try again.</p>}
                         </div>
-                        <button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg py-4 rounded-xl transition shadow-lg shadow-orange-200 mt-2 flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-key"></i> Unlock Dashboard
+
+                        {loginError && (
+                            <div className="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-xs font-bold text-center">
+                                <i className="fa-solid fa-circle-exclamation mr-1.5"></i> {loginError}
+                            </div>
+                        )}
+
+                        <button 
+                            type="submit" 
+                            disabled={isAuthenticating}
+                            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold text-base py-4 rounded-xl transition shadow-lg shadow-orange-200 mt-2 flex items-center justify-center gap-2"
+                        >
+                            {isAuthenticating ? (
+                                <><i className="fa-solid fa-circle-notch fa-spin"></i> Authenticating...</>
+                            ) : (
+                                <><i className="fa-solid fa-key"></i> Login to Server</>
+                            )}
                         </button>
                     </form>
                 </div>
@@ -554,13 +636,13 @@ function Admin() {
                 <div className="bg-gradient-to-r from-orange-600 to-orange-500 p-6 md:p-8 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row justify-between items-center gap-4">
                     <div>
                         <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-orange-200 mb-1">
-                            <i className="fa-solid fa-[#10B981] fa-circle text-[8px] animate-pulse"></i> Supabase Live Database
+                            <i className="fa-solid fa-[#10B981] fa-circle text-[8px] animate-pulse"></i> Supabase Server Authenticated
                         </div>
                         <h1 className="text-2xl md:text-4xl font-black tracking-tight">Sports Spectra 4.0 Admin</h1>
                     </div>
                     <div className="flex items-center gap-3">
                         <span className="bg-black/20 text-white px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 backdrop-blur">
-                            <i className="fa-solid fa-database text-emerald-400"></i> Connected to Supabase
+                            <i className="fa-solid fa-user-check text-emerald-400"></i> {currentUserEmail}
                         </span>
                         <button 
                             onClick={handleLogout}
