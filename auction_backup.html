@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sports Spectra 4.0 - Auction Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,900;1,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #F3F4F6; color: #111827; }
+        .hero-font { font-family: 'Inter', sans-serif; font-style: italic; font-weight: 900; text-transform: uppercase; }
+        
+        .sidebar { background: url('left-navbar.png') no-repeat center center; background-size: cover; width: 260px; transition: all 0.3s; }
+        .sidebar-item { color: #9CA3AF; transition: all 0.2s; border-radius: 12px; margin: 4px 16px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 14px; cursor: pointer; }
+        .sidebar-item:hover { background: rgba(255, 255, 255, 0.05); color: white; }
+        .sidebar-item.active { background: #FF6B00; color: white; box-shadow: 0 10px 15px -3px rgba(255, 107, 0, 0.4); }
+        
+        .main-content { background: url('bg.png') no-repeat center center fixed; background-size: cover; position: relative; overflow-x: hidden; }
+        
+        .header-bg { background: url('header.png') no-repeat center; background-size: cover; border-bottom: 1px solid rgba(0,0,0,0.05); }
+        .stat-card { border-radius: 20px; padding: 16px 24px; display: flex; align-items: center; gap: 16px; border: 1px solid rgba(0, 0, 0, 0.05); }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 4px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    
+    <!-- SIDEBAR -->
+    <aside class="sidebar flex flex-col shrink-0" id="sidebar">
+        <div class="p-8">
+            <div class="flex items-center gap-3">
+                <div class="bg-orange-600 p-2 rounded-xl text-white">
+                    <i class="fa-solid fa-bolt-lightning"></i>
+                </div>
+                <div class="hero-font text-white text-lg leading-none cursor-pointer" onclick="showLandingView()">
+                    SPORTS<br><span class="text-orange-500">SPECTRA 4.0</span>
+                </div>
+            </div>
+        </div>
+        
+        <nav class="flex-1 mt-4 overflow-y-auto no-scrollbar">
+            <a id="homeLink" onclick="showLandingView()" class="sidebar-item"></a>
+            <div class="px-8 mt-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Franchises</div>
+            <div id="teamButtons"></div>
+        </nav>
+        
+    </aside>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 flex flex-col main-content overflow-y-auto relative">
+        
+        
+
+        <!-- LANDING VIEW (Teams Grid) -->
+        <div id="landingView" class="p-10 flex-1 relative z-10">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl md:text-5xl font-black text-black tracking-tight">Franchise Overview</h2>
+                <p class="text-gray-500 mt-3 font-medium">Select a franchise from the sidebar or grid to view detailed squad and bidding information.</p>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl mx-auto" id="teamGrid"></div>
+        </div>
+
+        <!-- DASHBOARD VIEW (Single Team) -->
+        <div id="dashboardView" class="p-10 flex-1 relative z-10" style="display: none;">
+            
+            <!-- LIVE AUCTION Title & Breadcrumbs -->
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Live Auction</p>
+                    <h2 class="hero-font text-4xl text-gray-900 tracking-tight">AUCTION <span class="text-orange-500">DASHBOARD</span></h2>
+                    <div class="flex items-center gap-2 text-[11px] text-gray-400 mt-1 font-bold uppercase tracking-wider">
+                        <a href="index.html" class="hover:text-orange-500 transition"><i class="fa-solid fa-house"></i></a> / 
+                        <a href="#" onclick="showLandingView()" class="hover:text-orange-500 transition">Teams</a> / 
+                        <span id="breadcrumbTeam2" class="text-gray-900">Team 1</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="bg-white/90 backdrop-blur px-6 py-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer hover:shadow transition">
+                        <div class="text-orange-500"><i class="fa-solid fa-tower-broadcast animate-pulse"></i></div>
+                        <div class="text-right">
+                            <p class="text-[9px] font-black text-gray-400 uppercase tracking-wider">Sports Spectra 4.0</p>
+                            <p class="text-xs font-bold text-gray-900">Live Updates</p>
+                        </div>
+                        <i class="fa-solid fa-arrow-right text-[10px] text-gray-300 ml-4"></i>
+                    </div>
+                    <div class="relative cursor-pointer hover:text-orange-500 transition">
+                        <i class="fa-regular fa-bell text-xl text-gray-400"></i>
+                        <span class="absolute -top-1 -right-1 bg-orange-500 w-2.5 h-2.5 rounded-full border-2 border-white"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TEAM INFO & STATS -->
+            <div class="flex justify-between items-center mb-10 bg-orange-50/40 p-6 rounded-[24px] border border-orange-100/50 backdrop-blur-sm shadow-sm">
+                <div>
+                    <h2 class="text-5xl font-black tracking-tighter text-gray-900" id="teamTitle">TEAM 1</h2>
+                    <p class="text-orange-500 font-black text-xs uppercase tracking-[0.2em] mt-2" id="teamSquadCount">2 PLAYERS SQUAD</p>
+                </div>
+                <div class="flex gap-4">
+                    <div class="stat-card bg-[#FFF0F5] shadow-sm">
+                        <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-pink-500 shadow-sm"><i class="fa-solid fa-user-group text-xl"></i></div>
+                        <div>
+                            <p class="text-[10px] font-extrabold text-pink-400 uppercase tracking-widest">Girls Needed</p>
+                            <p class="text-3xl font-black text-pink-600 leading-none mt-1" id="girlsNeeded">14</p>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-white shadow-sm">
+                        <div class="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-600 shadow-inner border border-gray-100"><i class="fa-solid fa-coins text-xl"></i></div>
+                        <div>
+                            <p class="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Total Spent</p>
+                            <p class="text-3xl font-black text-gray-900 leading-none mt-1" id="totalSpent">₹0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card bg-[#EBFCF5] shadow-sm">
+                        <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><i class="fa-solid fa-money-bill-wave text-xl"></i></div>
+                        <div>
+                            <p class="text-[10px] font-extrabold text-green-500 uppercase tracking-widest">Purse Left</p>
+                            <p class="text-3xl font-black text-green-600 leading-none mt-1" id="purseLeft">₹10,000</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LEADERS SECTION -->
+            <div class="grid grid-cols-2 gap-8 mb-10" id="leadersContainer"></div>
+
+            <!-- PLAYERS TABLE -->
+            <div class="bg-white/90 backdrop-blur-md rounded-3xl border border-gray-100 overflow-hidden shadow-xl shadow-gray-200/50">
+                <div class="p-6 border-b border-gray-100 bg-white/50 flex items-center justify-between">
+                    <h3 class="font-bold text-lg text-gray-900"><i class="fa-solid fa-users text-orange-500 mr-2"></i> Squad Members</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50/80">
+                            <tr>
+                                <th class="px-8 py-5 font-bold">Player</th>
+                                <th class="px-8 py-5 font-bold">Gender</th>
+                                <th class="px-8 py-5 font-bold">Yr / Sec</th>
+                                <th class="px-8 py-5 font-bold">Sports</th>
+                                <th class="px-8 py-5 font-bold text-right">Bid (₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="playersTableBody" class="divide-y divide-gray-100/80">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <script>
+        const TOTAL_PURSE = 10000; 
+        const TEAMS = ['Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5', 'Team 6', 'Team 7', 'Team 8'];
+        let activeTeam = TEAMS[0];
+
+        // Using proper casing for display, matching admin.html team names
+        const HARDCODED_LEADERS = {
+            'Team 1': { captain: { name: 'Atharva Anil Masharkar', gender: 'M', initials: 'AM', color: '#D6CFCB' }, viceCaptain: { name: 'SHRIYA YERANE', gender: 'F', initials: 'SY', color: '#2196F3' } },
+            'Team 2': { captain: { name: 'Chaitanya Kharpate', gender: 'M', initials: 'CK', color: '#FFB74D' }, viceCaptain: { name: 'Mahek Malkan', gender: 'F', initials: 'MM', color: '#BA68C8' } },
+            'Team 3': { captain: { name: 'Karan Deshmukh', gender: 'M', initials: 'KD', color: '#4DB6AC' }, viceCaptain: { name: 'Sejal Lende', gender: 'F', initials: 'SL', color: '#F06292' } },
+            'Team 4': { captain: { name: 'Ranvir Thakur', gender: 'M', initials: 'RT', color: '#7986CB' }, viceCaptain: { name: 'Radhika Sapate', gender: 'F', initials: 'RS', color: '#FF8A65' } },
+            'Team 5': { captain: { name: 'Arnav Sakharkar', gender: 'M', initials: 'AS', color: '#E65100' }, viceCaptain: { name: 'Ritisha Naigaonkar', gender: 'F', initials: 'RN', color: '#0277BD' } }, // Updated colors for T5 to match screenshot
+            'Team 6': { captain: { name: 'Manthan Gujar', gender: 'M', initials: 'MG', color: '#D84315' }, viceCaptain: { name: 'Aarya Raut', gender: 'F', initials: 'AR', color: '#C5E1A5' } }, // Matches screenshot 2
+            'Team 7': { captain: { name: 'Parth tiwaskar', gender: 'M', initials: 'PT', color: '#A1887F' }, viceCaptain: { name: 'Janhavi Admane', gender: 'F', initials: 'JA', color: '#F48FB1' } },
+            'Team 8': { captain: { name: 'Shervin Peter', gender: 'M', initials: 'SP', color: '#90A4AE' }, viceCaptain: { name: 'Gauri Savale', gender: 'F', initials: 'GS', color: '#FFD54F' } }
+        };
+
+        // Normalize team name for lookups since admin might use 'TEAM 1' instead of 'Team 1'
+        function getNormalizedTeam(teamName) {
+            return teamName.toLowerCase().replace(/\s+/g, '');
+        }
+
+        function getPlayers() {
+            return JSON.parse(localStorage.getItem('auctionPlayers') || '[]');
+        }
+
+        function showLandingView() {
+            activeTeam = null;
+            document.getElementById('landingView').style.display = 'block';
+            document.getElementById('dashboardView').style.display = 'none';
+            
+            const homeLink = document.getElementById('homeLink');
+            homeLink.innerHTML = '<i class="fa-solid fa-arrow-left w-5 text-center"></i> Back to main website';
+            homeLink.onclick = () => window.location.href = 'index.html';
+            
+            renderSidebar();
+            renderLandingGrid();
+        }
+
+        function selectTeam(team) {
+            activeTeam = team;
+            document.getElementById('landingView').style.display = 'none';
+            document.getElementById('dashboardView').style.display = 'block';
+            document.getElementById('breadcrumbTeam2').innerText = team;
+            
+            const homeLink = document.getElementById('homeLink');
+            homeLink.innerHTML = '<i class="fa-solid fa-house-chimney w-5 text-center"></i> Dashboard';
+            homeLink.onclick = showLandingView;
+            
+            renderSidebar();
+            renderTeam();
+        }
+
+        function renderSidebar() {
+            const container = document.getElementById('teamButtons');
+            container.innerHTML = TEAMS.map(team => `
+                <a onclick="selectTeam('${team}')" class="sidebar-item ${team === activeTeam ? 'active' : ''}">
+                    <i class="fa-solid fa-users w-5 text-center"></i> ${team}
+                    ${team === activeTeam ? '<i class="fa-solid fa-chevron-right ml-auto text-[10px]"></i>' : ''}
+                </a>
+            `).join('');
+        }
+
+        function renderLandingGrid() {
+            const allPlayers = getPlayers();
+            const grid = document.getElementById('teamGrid');
+            grid.innerHTML = '';
+            
+            TEAMS.forEach(team => {
+                const teamPlayers = allPlayers.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(team));
+                const totalSpent = teamPlayers.reduce((sum, p) => sum + Number(p.bidAmount), 0);
+                const purseLeft = TOTAL_PURSE - totalSpent;
+                
+                const card = document.createElement('div');
+                card.className = 'bg-white/90 backdrop-blur-md rounded-3xl p-8 border border-white/50 shadow-xl shadow-gray-200/50 hover:-translate-y-2 hover:shadow-orange-200 transition-all cursor-pointer group text-center flex flex-col justify-between h-full';
+                card.onclick = () => selectTeam(team);
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="w-20 h-20 bg-gradient-to-br from-orange-50 to-orange-100 text-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6 text-3xl group-hover:scale-110 transition-transform shadow-inner">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <h3 class="text-2xl font-black text-gray-900 group-hover:text-orange-500 transition-colors uppercase tracking-tight">${team}</h3>
+                        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2">${teamPlayers.length + 2} MEMBERS SQUAD</p>
+                    </div>
+                    <div class="mt-8 pt-6 border-t border-gray-100 flex justify-between items-end text-left">
+                        <div>
+                            <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Purse Left</p>
+                            <p class="text-lg font-black text-green-500 leading-none">₹${purseLeft.toLocaleString('en-IN')}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-1">Spent</p>
+                            <p class="text-lg font-black text-gray-900 leading-none">₹${totalSpent.toLocaleString('en-IN')}</p>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderLeaderCard(player, roleTitle, roleIcon, bgColor) {
+            const roleColor = roleTitle === 'CAPTAIN' ? 'bg-[#FF4500]' : 'bg-[#1e1e1e]';
+            
+            // Adjust text color based on background darkness for better contrast
+            const isLightBg = ['#D6CFCB', '#FFB74D', '#F06292', '#FF8A65', '#C5E1A5', '#FFD54F', '#A1887F', '#90A4AE'].includes(bgColor);
+            const initialColor = isLightBg ? 'text-gray-900' : 'text-white';
+            
+            const cardBgImg = player.gender === 'M' ? 'boy_bg.png' : 'girl_bg.png';
+            
+            return `
+            <div class="bg-white rounded-[40px] p-10 shadow-xl shadow-gray-200/50 border border-white overflow-hidden relative group hover:shadow-2xl hover:shadow-orange-100 transition-all duration-300"
+                 style="background: url('${cardBgImg}') no-repeat center center; background-size: cover;">
+                <div class="absolute top-0 right-0 ${roleColor} text-white px-6 py-2 rounded-bl-3xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 z-10 shadow-sm">
+                    <i class="fa-solid ${roleIcon}"></i> ${roleTitle}
+                </div>
+                <div class="flex flex-col items-center relative z-10">
+                    <div class="w-40 h-40 rounded-[32px] flex items-center justify-center text-5xl font-black ${initialColor} shadow-inner mb-8 group-hover:scale-105 transition-transform duration-300 border border-black/5" style="background-color: ${bgColor}">
+                        ${player.initials}
+                    </div>
+                    <h3 class="text-3xl font-black tracking-tighter text-center text-gray-900 leading-tight">${player.name}</h3>
+                    <p class="text-gray-400 font-bold uppercase text-[10px] mt-2 tracking-widest">${player.gender} &nbsp;|&nbsp; PLAYER</p>
+                    <div class="mt-8 bg-orange-50 border border-orange-100 px-8 py-2.5 rounded-full flex items-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-circle-check text-orange-500"></i>
+                        <span class="text-orange-500 font-black text-xs uppercase tracking-widest">RETAINED</span>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function renderTeam() {
+            if (!activeTeam) return;
+
+            const allPlayers = getPlayers();
+            // Match players even if admin typed "TEAM 1" and sidebar has "Team 1"
+            const teamPlayers = allPlayers.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(activeTeam));
+            
+            const captainData = HARDCODED_LEADERS[activeTeam].captain;
+            const viceCaptainData = HARDCODED_LEADERS[activeTeam].viceCaptain;
+            
+            const regulars = teamPlayers.filter(p => p.role === 'Player');
+            
+            const totalGirls = (captainData.gender === 'F' ? 1 : 0) + (viceCaptainData.gender === 'F' ? 1 : 0) + regulars.filter(p => p.gender === 'F').length;
+            const girlsRemaining = Math.max(0, 15 - totalGirls);
+            
+            const totalSpent = teamPlayers.reduce((sum, p) => sum + Number(p.bidAmount), 0);
+            const purseLeft = TOTAL_PURSE - totalSpent;
+
+            document.getElementById('teamTitle').textContent = activeTeam.toUpperCase();
+            document.getElementById('teamSquadCount').textContent = `${teamPlayers.length + 2} PLAYERS SQUAD`;
+            
+            document.getElementById('totalSpent').textContent = `₹${totalSpent.toLocaleString('en-IN')}`;
+            document.getElementById('purseLeft').textContent = `₹${purseLeft.toLocaleString('en-IN')}`;
+            document.getElementById('girlsNeeded').textContent = girlsRemaining;
+            
+            document.getElementById('leadersContainer').innerHTML = 
+                renderLeaderCard(captainData, 'CAPTAIN', 'fa-crown', captainData.color) + 
+                renderLeaderCard(viceCaptainData, 'VICE CAPTAIN', 'fa-star', viceCaptainData.color);
+            
+            const tbody = document.getElementById('playersTableBody');
+            if(regulars.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-8 py-16 text-center text-gray-400 font-medium bg-gray-50/30">No other players drafted yet.</td></tr>`;
+            } else {
+                tbody.innerHTML = regulars.map(p => {
+                    const avatar = p.photoUrl || ('https://ui-avatars.com/api/?name=' + encodeURIComponent(p.name) + '&background=random');
+                    return `
+                    <tr class="hover:bg-orange-50/50 transition-colors group cursor-default">
+                        <td class="px-8 py-4 whitespace-nowrap">
+                            <div class="flex items-center gap-4">
+                                <img src="${avatar}" class="w-10 h-10 rounded-full bg-gray-200 object-cover shadow-sm group-hover:scale-110 transition-transform">
+                                <span class="font-bold text-gray-900">${p.name}</span>
+                            </div>
+                        </td>
+                        <td class="px-8 py-4 text-gray-500 font-semibold">${p.gender}</td>
+                        <td class="px-8 py-4 text-gray-500 font-semibold">${p.year} / ${p.section}</td>
+                        <td class="px-8 py-4 text-gray-500 text-xs font-medium uppercase tracking-wider">${p.sports}</td>
+                        <td class="px-8 py-4 font-black text-orange-500 text-right text-base">₹${Number(p.bidAmount).toLocaleString('en-IN')}</td>
+                    </tr>
+                `}).join('');
+            }
+        }
+
+        window.addEventListener('storage', () => {
+            if(document.getElementById('landingView').style.display === 'block') {
+                renderLandingGrid();
+            } else if (activeTeam) {
+                renderTeam(); 
+            }
+        });
+        
+        // Start on landing view
+        showLandingView();
+    </script>
+</body>
+</html>
