@@ -16,6 +16,7 @@ function Admin() {
     const [emailInput, setEmailInput] = useState('');
     const [passwordInput, setPasswordInput] = useState('');
     const [loginError, setLoginError] = useState(false);
+    const [loginLoading, setLoginLoading] = useState(false);
 
     useEffect(() => {
         // Check current session
@@ -216,12 +217,14 @@ function Admin() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        
+        setLoginLoading(true);
         setLoginError(false);
         const { error } = await supabase.auth.signInWithPassword({
             email: emailInput,
             password: passwordInput,
         });
+        
+        setLoginLoading(false);
 
         if (error) {
             setLoginError(true);
