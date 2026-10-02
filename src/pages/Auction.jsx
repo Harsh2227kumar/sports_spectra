@@ -12,7 +12,7 @@ const HARDCODED_LEADERS = {
     'ASTRA': { captain: { name: 'Karan Deshmukh', gender: 'M', initials: 'KD', color: '#4DB6AC' }, viceCaptain: { name: 'Sejal Lende', gender: 'F', initials: 'SL', color: '#F06292' } },
     'BRAVO': { captain: { name: 'Ranvir Thakur', gender: 'M', initials: 'RT', color: '#7986CB' }, viceCaptain: { name: 'Radhika Sapate', gender: 'F', initials: 'RS', color: '#FF8A65' } },
     'HELLFIRE': { captain: { name: 'Arnav Sakharkar', gender: 'M', initials: 'AS', color: '#E65100' }, viceCaptain: { name: 'Ritisha Naigaonkar', gender: 'F', initials: 'RN', color: '#0277BD' } },
-    'AUREX': { captain: { name: 'Manthan Gujar', gender: 'M', initials: 'MG', color: '#D84315', photo: '/manthan.png' }, viceCaptain: { name: 'Aarya Raut', gender: 'F', initials: 'AR', color: '#C5E1A5' } },
+    'AUREX': { captain: { name: 'Manthan Gujar', gender: 'M', initials: 'MG', color: '#D84315' }, viceCaptain: { name: 'Aarya Raut', gender: 'F', initials: 'AR', color: '#C5E1A5' } },
     'TITANS': { captain: { name: 'Parth tiwaskar', gender: 'M', initials: 'PT', color: '#A1887F' }, viceCaptain: { name: 'Janhavi Admane', gender: 'F', initials: 'JA', color: '#F48FB1' } },
     'NEMESIS': { captain: { name: 'Shervin Peter', gender: 'M', initials: 'SP', color: '#90A4AE' }, viceCaptain: { name: 'Gauri Savale', gender: 'F', initials: 'GS', color: '#FFD54F' } }
 };
