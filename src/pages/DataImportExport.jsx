@@ -10,6 +10,7 @@ import {
   getLocalTeams,
   saveLocalTeams,
   updateCustomSupabaseCredentials,
+  getSupabaseConfig,
   sanitizeCsvCell
 } from '../supabaseClient';
 
