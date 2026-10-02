@@ -10,33 +10,29 @@ import {
   getLocalTeams,
   saveLocalTeams,
   updateCustomSupabaseCredentials,
-  validateAdminSession,
-  createAdminSession,
-  clearAdminSession,
-  checkLoginRateLimit,
-  recordFailedLogin,
-  resetLoginAttempts,
   sanitizeCsvCell
 } from '../supabaseClient';
 
 export default function DataImportExport() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => validateAdminSession());
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState(false);
-  const [lockoutTime, setLockoutTime] = useState(() => checkLoginRateLimit());
+  const [loginLoading, setLoginLoading] = useState(false);
 
   useEffect(() => {
-    let interval;
-    if (lockoutTime > 0) {
-      interval = setInterval(() => {
-        setLockoutTime((prev) => {
-          if (prev <= 1) return 0;
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [lockoutTime]);
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Database status
   const [dbStatus, setDbStatus] = useState({ loading: true, connected: false, latency: 0, message: '' });
@@ -181,29 +177,26 @@ export default function DataImportExport() {
     };
   }, [isAuthenticated]);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    if (lockoutTime > 0) return;
+    setLoginLoading(true);
+    setLoginError(false);
     
-    const expected = import.meta.env.VITE_ADMIN_PASSWORD || '';
-    if (passwordInput === expected && expected !== '') {
-      createAdminSession(expected);
-      setIsAuthenticated(true);
-      setLoginError(false);
-      resetLoginAttempts();
-    } else {
-      const remainingLockout = recordFailedLogin();
-      if (remainingLockout > 0) {
-        setLockoutTime(remainingLockout);
-      }
+    const { error } = await supabase.auth.signInWithPassword({
+      email: emailInput,
+      password: passwordInput,
+    });
+    
+    setLoginLoading(false);
+
+    if (error) {
       setLoginError(true);
       setPasswordInput('');
     }
   };
 
-  const handleLogout = () => {
-    clearAdminSession();
-    setIsAuthenticated(false);
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   // CSV Upload & Pre-import Validation
@@ -522,7 +515,19 @@ export default function DataImportExport() {
           <p className="text-gray-500 text-sm mb-8">Enter admin password to manage player data, CSV imports, and database schemas.</p>
           
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <div>
+            <div className="space-y-3">
+              <input 
+                type="email" 
+                value={emailInput}
+                onChange={(e) => {
+                  setEmailInput(e.target.value);
+                  setLoginError(false);
+                }}
+                placeholder="Admin Email" 
+                className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-xl p-4 text-center font-medium focus:outline-none transition`}
+                required
+                autoFocus
+              />
               <input 
                 type="password" 
                 value={passwordInput}
@@ -530,16 +535,14 @@ export default function DataImportExport() {
                   setPasswordInput(e.target.value);
                   setLoginError(false);
                 }}
-                placeholder="Enter Admin Password" 
+                placeholder="Password" 
                 className={`w-full bg-gray-50 border ${loginError ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-orange-500'} rounded-xl p-4 text-center font-medium focus:outline-none transition`}
                 required
-                autoFocus
               />
-              {loginError && !lockoutTime && <p className="text-red-500 text-xs font-bold mt-2">Incorrect password. Please try again.</p>}
-              {lockoutTime > 0 && <p className="text-red-500 text-xs font-bold mt-2">Too many failed attempts. Locked out for {lockoutTime}s.</p>}
+              {loginError && <p className="text-red-500 text-xs font-bold mt-2">Invalid email or password.</p>}
             </div>
-            <button type="submit" disabled={lockoutTime > 0} className={`w-full text-white font-bold text-lg py-4 rounded-xl transition shadow-lg mt-2 cursor-pointer ${lockoutTime > 0 ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-200'}`}>
-              {lockoutTime > 0 ? `Locked (${lockoutTime}s)` : 'Access Data Manager'}
+            <button type="submit" disabled={loginLoading} className={`w-full text-white font-bold text-lg py-4 rounded-xl transition shadow-lg mt-2 cursor-pointer ${loginLoading ? 'bg-gray-400 cursor-not-allowed shadow-none' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-200'}`}>
+              {loginLoading ? 'Authenticating...' : 'Access Data Manager'}
             </button>
           </form>
         </div>
