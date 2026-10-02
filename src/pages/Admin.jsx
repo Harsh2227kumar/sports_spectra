@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Papa from 'papaparse';
 import { supabase } from '../supabaseClient';
 
 function Admin() {
@@ -33,18 +34,139 @@ function Admin() {
     const [duplicateError, setDuplicateError] = useState(null);
 
     useEffect(() => {
-        const loadPlayers = () => {
-            setPlayers(JSON.parse(localStorage.getItem('auctionPlayers') || '[]'));
+        const loadPlayers = async () => {
+            // First load from localStorage to be quick
+            const local = JSON.parse(localStorage.getItem('auctionPlayers') || '[]');
+            if (local.length > 0) setPlayers(local);
+
+            // Then fetch from Supabase to ensure we have UNSOLD players (if not in local)
+            const { data, error } = await supabase.from('players').select('*');
+            if (data && !error) {
+                // Map DB schema to local schema
+                const mapped = data.map(dbPlayer => ({
+                    id: dbPlayer.id,
+                    team: dbPlayer.team,
+                    role: dbPlayer.role,
+                    name: dbPlayer.name,
+                    gender: dbPlayer.gender,
+                    year: dbPlayer.year,
+                    section: dbPlayer.section,
+                    sports: dbPlayer.sports,
+                    bidAmount: dbPlayer.bid_amount,
+                    photoUrl: dbPlayer.photo_url
+                }));
+                setPlayers(mapped);
+                localStorage.setItem('auctionPlayers', JSON.stringify(mapped));
+            }
         };
         loadPlayers();
         window.addEventListener('storage', loadPlayers);
 
         return () => window.removeEventListener('storage', loadPlayers);
     }, []);
+
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                const rawData = results.data;
+                const normalized = rawData.map(row => {
+                    const obj = {};
+                    for (const key of Object.keys(row)) {
+                        const k = key.trim().toLowerCase();
+                        if (k === 'name' || k === 'player name' || k === 'playername') obj.name = String(row[key]).trim();
+                        else if (k === 'gender' || k === 'sex') obj.gender = String(row[key]).trim().toUpperCase().charAt(0);
+                        else if (k === 'year' || k === 'yr') obj.year = String(row[key]).trim();
+                        else if (k === 'section' || k === 'sec') obj.section = String(row[key]).trim();
+                        else if (k === 'sport 1' || k === 'sport1' || k === 'sports') obj.sport1 = String(row[key]).trim();
+                        else if (k === 'sport 2' || k === 'sport2') obj.sport2 = String(row[key]).trim();
+                        else if (k === 'photo' || k === 'photo url' || k === 'photourl' || k === 'image') obj.photo = String(row[key]).trim();
+                    }
+                    const sports = [obj.sport1, obj.sport2].filter(Boolean).join(', ');
+                    return {
+                        team: 'UNSOLD',
+                        role: 'Player',
+                        name: obj.name,
+                        gender: obj.gender || 'M',
+                        year: obj.year || '',
+                        section: obj.section || '',
+                        sports: sports,
+                        bid_amount: 0,
+                        photo_url: obj.photo || ''
+                    };
+                }).filter(row => row.name);
+
+                try {
+                    const { error } = await supabase.from('players').insert(normalized);
+                    if (error) throw error;
+                    alert(`Successfully imported ${normalized.length} players to the database!`);
+                    // Reload to reflect changes
+                    window.dispatchEvent(new Event('storage'));
+                    
+                    // Manually trigger reload to get new UUIDs
+                    const { data } = await supabase.from('players').select('*');
+                    if (data) {
+                        const mapped = data.map(dbPlayer => ({
+                            id: dbPlayer.id,
+                            team: dbPlayer.team,
+                            role: dbPlayer.role,
+                            name: dbPlayer.name,
+                            gender: dbPlayer.gender,
+                            year: dbPlayer.year,
+                            section: dbPlayer.section,
+                            sports: dbPlayer.sports,
+                            bidAmount: dbPlayer.bid_amount,
+                            photoUrl: dbPlayer.photo_url
+                        }));
+                        setPlayers(mapped);
+                        localStorage.setItem('auctionPlayers', JSON.stringify(mapped));
+                    }
+                } catch (err) {
+                    alert('Error importing to Supabase: ' + err.message);
+                }
+            },
+            error: (error) => {
+                alert("Error parsing CSV: " + error.message);
+            }
+        });
+        
+        // Reset file input
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
     const handleNameChange = (e) => {
         setDuplicateError(null);
         const value = e.target.value;
         setFormData(prev => ({ ...prev, playerName: value }));
+
+        if (value.length >= 2) {
+            const matches = players.filter(p =>
+                p.team === 'UNSOLD' && p.name.toLowerCase().includes(value.toLowerCase())
+            ).slice(0, 8);
+            setSuggestions(matches);
+            setShowSuggestions(matches.length > 0);
+        } else {
+            setSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const selectSuggestion = (player) => {
+        setFormData(prev => ({
+            ...prev,
+            playerName: player.name || prev.playerName,
+            gender: (player.gender === 'M' || player.gender === 'F') ? player.gender : prev.gender,
+            year: player.year || prev.year,
+            section: player.section || prev.section,
+            sports: player.sports || prev.sports,
+            photoUrl: player.photoUrl || prev.photoUrl
+        }));
+        setShowSuggestions(false);
+        setSuggestions([]);
     };
 
     const handleChange = (e) => {
@@ -92,11 +214,14 @@ function Admin() {
         
         const currentPlayers = JSON.parse(localStorage.getItem('auctionPlayers') || '[]');
         
-        if (editPlayerId) {
-            // Update existing player
+        const existingPlayer = currentPlayers.find(p => p.name.toLowerCase() === formData.playerName.trim().toLowerCase());
+        const isUpdate = editPlayerId || (existingPlayer && existingPlayer.team === 'UNSOLD');
+        const targetId = editPlayerId || (existingPlayer ? existingPlayer.id : null);
+
+        if (isUpdate) {
             let editedPlayer = null;
             const updatedPlayers = currentPlayers.map(p => {
-                if (p.id === editPlayerId) {
+                if (p.id === targetId) {
                     editedPlayer = {
                         ...p,
                         team: formData.team,
@@ -121,16 +246,13 @@ function Admin() {
                 syncToSupabase(editedPlayer, 'edit');
             }
         } else {
-            // Check if player is already drafted
-            const alreadyDrafted = currentPlayers.find(p => p.name.toLowerCase() === formData.playerName.trim().toLowerCase());
-            if (alreadyDrafted) {
-                setDuplicateError(`Cannot add duplicate! ${formData.playerName} has already been drafted to ${alreadyDrafted.team}.`);
+            if (existingPlayer) {
+                setDuplicateError(`Cannot add duplicate! ${formData.playerName} has already been drafted to ${existingPlayer.team}.`);
                 return;
             }
 
-            // Add new player
             const player = {
-                id: Date.now(),
+                id: Date.now(), // Fallback if uuid is not immediately returned
                 team: formData.team,
                 role: formData.role,
                 name: formData.playerName,
@@ -151,7 +273,6 @@ function Admin() {
             localStorage.setItem('auctionPlayers', JSON.stringify(currentPlayers));
             setPlayers(currentPlayers);
 
-            // Send to Supabase
             syncToSupabase(player, 'add');
         }
 
@@ -272,6 +393,28 @@ function Admin() {
                 </div>
 
 
+                <div className="px-8 pt-6">
+                    <div className="flex items-center justify-between bg-blue-50 border border-blue-100 p-4 rounded-xl">
+                        <div>
+                            <h3 className="text-sm font-bold text-blue-900">Import Players List (CSV)</h3>
+                            <p className="text-xs text-blue-600 mt-1">Upload a CSV file to add available players to the database for autocomplete.</p>
+                        </div>
+                        <input
+                            type="file"
+                            accept=".csv"
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            id="csvUpload"
+                        />
+                        <label
+                            htmlFor="csvUpload"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg cursor-pointer transition shadow-md"
+                        >
+                            <i className="fa-solid fa-file-csv mr-2"></i>Upload CSV
+                        </label>
+                    </div>
+                </div>
                 
                 <form onSubmit={handleSubmit} className="p-8 flex flex-col gap-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -300,12 +443,47 @@ function Admin() {
                                 id="playerName"
                                 value={formData.playerName}
                                 onChange={handleNameChange}
+                                onFocus={() => {
+                                    if (formData.playerName.length >= 2 && suggestions.length > 0) {
+                                        setShowSuggestions(true);
+                                    }
+                                }}
                                 className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-medium focus:outline-none focus:border-orange-500"
-                                placeholder="e.g. John Doe"
+                                placeholder="Start typing to search available players..."
                                 required
                                 autoComplete="off"
                             />
+                            {players.some(p => p.team === 'UNSOLD') && (
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-400 pointer-events-none">
+                                    <i className="fa-solid fa-magnifying-glass text-sm"></i>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Autocomplete Dropdown */}
+                        {showSuggestions && (
+                            <div className="absolute z-50 left-0 right-0 mt-1 bg-white rounded-xl border border-gray-200 shadow-2xl shadow-gray-200/60 max-h-64 overflow-y-auto">
+                                {suggestions.map((s, idx) => (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        onClick={() => selectSuggestion(s)}
+                                        className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-orange-50 transition border-b border-gray-50 last:border-b-0 group"
+                                    >
+                                        <div className="w-9 h-9 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-black text-xs shrink-0 group-hover:bg-orange-200 transition">
+                                            {s.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{s.name}</p>
+                                            <p className="text-xs text-gray-400 truncate">
+                                                {[s.gender, s.year && `Year ${s.year}`, s.section && `Sec ${s.section}`, s.sports].filter(Boolean).join(' • ')}
+                                            </p>
+                                        </div>
+                                        <i className="fa-solid fa-arrow-turn-down text-gray-300 text-xs group-hover:text-orange-500 transition"></i>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
@@ -374,10 +552,10 @@ function Admin() {
                     <button onClick={clearData} className="text-xs bg-red-100 text-red-600 px-3 py-1 rounded-full font-bold hover:bg-red-200 transition">Clear All Data</button>
                 </div>
                 <div className="flex flex-col gap-2 text-sm max-h-[300px] overflow-y-auto">
-                    {players.length === 0 ? (
+                    {players.filter(p => p.team !== 'UNSOLD').length === 0 ? (
                         <p className="text-gray-400 italic">No entries yet.</p>
                     ) : (
-                        players.slice().reverse().map(p => (
+                        players.filter(p => p.team !== 'UNSOLD').slice().reverse().map(p => (
                             <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border border-gray-100">
                                 <div><span className="font-bold">{p.name}</span> <span className="text-xs text-gray-500">({p.role})</span></div>
                                 <div className="text-right flex items-center justify-end gap-4">
