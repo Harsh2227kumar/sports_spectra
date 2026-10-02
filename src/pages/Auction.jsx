@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -52,45 +53,52 @@ function Auction() {
     };
 
     useEffect(() => {
-        const loadPlayers = () => {
-            const currentData = localStorage.getItem('auctionPlayers') || '[]';
-            setPlayers(prev => {
-                const prevStr = JSON.stringify(prev);
-                return prevStr !== currentData ? JSON.parse(currentData) : prev;
-            });
-        };
-        
-        loadPlayers();
-        window.addEventListener('storage', loadPlayers);
-        
-        // Polling fallback to guarantee updates even if storage event fails across same window/tabs
-        const interval = setInterval(loadPlayers, 1000);
-
-        // Live fetch from Google Sheets
-        const fetchLivePlayers = async () => {
-            const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL || localStorage.getItem('appsScriptUrl');
-            if (appsScriptUrl) {
-                try {
-                    const res = await fetch(appsScriptUrl);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.success && data.players) {
-                            localStorage.setItem('auctionPlayers', JSON.stringify(data.players));
-                        }
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch live players from Google Sheets", e);
-                }
+        const fetchSupabasePlayers = async () => {
+            const { data, error } = await supabase
+                .from('players')
+                .select('*');
+            
+            if (error) {
+                console.error("Error fetching from Supabase:", error);
+            } else if (data) {
+                // Map Supabase snake_case back to camelCase used by the frontend
+                const mappedData = data.map(p => ({
+                    id: p.id,
+                    team: p.team,
+                    role: p.role,
+                    name: p.name,
+                    gender: p.gender,
+                    year: p.year,
+                    section: p.section,
+                    sports: p.sports,
+                    bidAmount: p.bid_amount,
+                    photoUrl: p.photo_url
+                }));
+                setPlayers(mappedData);
+                localStorage.setItem('auctionPlayers', JSON.stringify(mappedData));
             }
         };
 
-        fetchLivePlayers();
-        const liveInterval = setInterval(fetchLivePlayers, 10000); // Poll every 10 seconds
-        
+        fetchSupabasePlayers();
+
+        // Subscribe to real-time changes
+        const subscription = supabase
+            .channel('players_channel')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, payload => {
+                fetchSupabasePlayers();
+            })
+            .subscribe();
+
+        // Local storage listener for manual changes in Admin tab (fallback)
+        const loadPlayers = () => {
+            const currentData = localStorage.getItem('auctionPlayers') || '[]';
+            setPlayers(JSON.parse(currentData));
+        };
+        window.addEventListener('storage', loadPlayers);
+
         return () => {
             window.removeEventListener('storage', loadPlayers);
-            clearInterval(interval);
-            clearInterval(liveInterval);
+            supabase.removeChannel(subscription);
         };
     }, []);
 

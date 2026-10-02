@@ -9,7 +9,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/auction" element={<Auction />} />
-        <Route path="/admin" element={<Admin />} />
+        <Route path="/doremon" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
