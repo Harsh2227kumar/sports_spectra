@@ -100,10 +100,31 @@ function Admin() {
                     };
                 }).filter(row => row.name);
 
+                const uniqueNewPlayers = [];
+                const seenNames = new Set(players.map(p => p.name.toLowerCase()));
+
+                for (const p of normalized) {
+                    const lowerName = p.name.toLowerCase();
+                    if (!seenNames.has(lowerName)) {
+                        uniqueNewPlayers.push(p);
+                        seenNames.add(lowerName); // prevent duplicates within the CSV itself
+                    }
+                }
+
+                if (uniqueNewPlayers.length === 0) {
+                    alert("No new players found in the CSV. All players already exist in the database.");
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    return;
+                }
+
                 try {
-                    const { error } = await supabase.from('players').insert(normalized);
+                    const { error } = await supabase.from('players').insert(uniqueNewPlayers);
                     if (error) throw error;
-                    alert(`Successfully imported ${normalized.length} players to the database!`);
+                    
+                    const ignoredCount = normalized.length - uniqueNewPlayers.length;
+                    const ignoreMsg = ignoredCount > 0 ? ` (${ignoredCount} duplicates ignored)` : '';
+                    alert(`Successfully imported ${uniqueNewPlayers.length} new players to the database!${ignoreMsg}`);
+                    
                     // Reload to reflect changes
                     window.dispatchEvent(new Event('storage'));
                     
