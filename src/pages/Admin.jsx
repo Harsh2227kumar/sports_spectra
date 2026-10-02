@@ -425,8 +425,8 @@ function Admin() {
                 </div>
 
 
-                <div className="px-8 pt-6">
-                    <div className="flex items-center justify-between bg-blue-50 border border-blue-100 p-4 rounded-xl">
+                <div className="px-6 md:px-8 pt-6">
+                    <div className="flex flex-col sm:flex-row items-center justify-between bg-blue-50 border border-blue-100 p-4 rounded-xl gap-4 text-center sm:text-left">
                         <div>
                             <h3 className="text-sm font-bold text-blue-900">Import Players List (CSV)</h3>
                             <p className="text-xs text-blue-600 mt-1">Upload a CSV file to add available players to the database for autocomplete.</p>
@@ -441,7 +441,7 @@ function Admin() {
                         />
                         <label
                             htmlFor="csvUpload"
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg cursor-pointer transition shadow-md"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-3 sm:py-2 rounded-lg cursor-pointer transition shadow-md w-full sm:w-auto shrink-0"
                         >
                             <i className="fa-solid fa-file-csv mr-2"></i>Upload CSV
                         </label>

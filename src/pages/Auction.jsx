@@ -135,10 +135,10 @@ function Auction() {
     };
 
     return (
-        <div className="flex h-screen overflow-hidden">
+        <div className="flex flex-col md:flex-row h-screen overflow-hidden">
             {/* SIDEBAR */}
-            <aside className="flex flex-col shrink-0" style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover', width: '260px', transition: 'all 0.3s' }}>
-                <div className="p-8">
+            <aside className="flex flex-col md:flex-col shrink-0 w-full md:w-[260px] h-auto md:h-full z-20 shadow-lg md:shadow-none" style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover', transition: 'all 0.3s' }}>
+                <div className="p-4 md:p-8 flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="bg-orange-600 p-2 rounded-xl text-white">
                             <i className="fa-solid fa-bolt-lightning"></i>
@@ -149,21 +149,21 @@ function Auction() {
                     </div>
                 </div>
                 
-                <nav className="flex-1 mt-4 overflow-y-auto no-scrollbar" onMouseLeave={() => setHoveredTeam(null)}>
+                <nav className="flex-1 px-2 md:px-0 mt-0 md:mt-4 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto no-scrollbar items-center md:items-stretch border-t border-white/5 md:border-none" onMouseLeave={() => setHoveredTeam(null)}>
                     {activeTeam ? (
-                        <a onClick={() => setActiveTeam(null)} className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-4 my-1 px-4 py-3 flex items-center gap-3 font-semibold text-sm cursor-pointer">
-                            <i className="fa-solid fa-house-chimney w-5 text-center"></i> Dashboard
+                        <a onClick={() => setActiveTeam(null)} className="shrink-0 text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-2 md:mx-4 my-2 md:my-1 px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 font-semibold text-xs md:text-sm cursor-pointer">
+                            <i className="fa-solid fa-house-chimney w-4 md:w-5 text-center"></i> <span className="hidden md:inline">Dashboard</span>
                         </a>
                     ) : (
-                        <Link to="/" className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-4 my-1 px-4 py-3 flex items-center gap-3 font-semibold text-sm cursor-pointer">
-                            <i className="fa-solid fa-arrow-left w-5 text-center"></i> Back to main website
+                        <Link to="/" className="shrink-0 text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-2 md:mx-4 my-2 md:my-1 px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 font-semibold text-xs md:text-sm cursor-pointer">
+                            <i className="fa-solid fa-arrow-left w-4 md:w-5 text-center"></i> <span className="hidden md:inline">Back</span>
                         </Link>
                     )}
-                    <div className="px-8 mt-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Franchises</div>
+                    <div className="hidden md:block px-8 mt-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Franchises</div>
                     
                     {TEAMS.map(team => (
                         <a key={team} onClick={() => handleTeamClick(team)} onMouseEnter={() => setHoveredTeam(team)}
-                           className={`relative block text-[#9CA3AF] hover:text-white transition-colors rounded-xl mx-4 my-1 px-4 py-3 cursor-pointer group ${(hoveredTeam || activeTeam) === team ? '!text-white' : ''}`}>
+                           className={`shrink-0 relative block text-[#9CA3AF] hover:text-white transition-colors rounded-xl mx-1 md:mx-4 my-2 md:my-1 px-3 md:px-4 py-2 md:py-3 cursor-pointer group ${(hoveredTeam || activeTeam) === team ? '!text-white' : ''}`}>
                             {(hoveredTeam || activeTeam) === team && (
                                 <motion.div
                                     layoutId="navIndicator"
@@ -171,9 +171,9 @@ function Auction() {
                                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                                 />
                             )}
-                            <span className="relative z-10 flex items-center gap-3 font-semibold text-sm">
-                                <i className="fa-solid fa-users w-5 text-center"></i> {team}
-                                {activeTeam === team && <i className="fa-solid fa-chevron-right ml-auto text-[10px]"></i>}
+                            <span className="relative z-10 flex items-center gap-2 md:gap-3 font-semibold text-xs md:text-sm whitespace-nowrap">
+                                <i className="fa-solid fa-users w-4 md:w-5 text-center"></i> <span className="md:hidden">{team.replace('TEAM ', 'T')}</span><span className="hidden md:inline">{team}</span>
+                                {activeTeam === team && <i className="hidden md:inline-block fa-solid fa-chevron-right ml-auto text-[10px]"></i>}
                             </span>
                         </a>
                     ))}
@@ -184,25 +184,25 @@ function Auction() {
             <main className="flex-1 flex flex-col overflow-y-auto relative" style={{ background: "url('/bg.png') no-repeat center center fixed", backgroundSize: 'cover' }}>
                 
                 {!activeTeam ? (
-                    <div className="p-10 flex-1 relative z-10">
-                        <div className="mb-12">
-                            <div className="flex items-center gap-2 mb-2">
+                    <div className="p-6 md:p-10 flex-1 relative z-10">
+                        <div className="mb-8 md:mb-12">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
                                 <div className="w-8 h-1 bg-orange-500 rounded-full"></div>
-                                <span className="text-xs font-bold text-gray-800 tracking-widest uppercase flex items-center gap-2">
+                                <span className="text-[10px] md:text-xs font-bold text-gray-800 tracking-widest uppercase flex flex-wrap items-center gap-2">
                                     Live Auction
                                     {isPageLoading ? (
-                                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1 animate-pulse"><i className="fa-solid fa-circle-notch fa-spin"></i> CONNECTING TO DB</span>
+                                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1 animate-pulse"><i className="fa-solid fa-circle-notch fa-spin"></i> CONNECTING</span>
                                     ) : isSyncing ? (
                                         <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1 animate-pulse"><i className="fa-solid fa-arrows-rotate fa-spin"></i> SYNCING</span>
                                     ) : (
-                                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1"><i className="fa-solid fa-circle text-[6px] animate-pulse"></i> SUPABASE LIVE</span>
+                                        <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-[9px] flex items-center gap-1"><i className="fa-solid fa-circle text-[6px] animate-pulse"></i> LIVE</span>
                                     )}
                                 </span>
                             </div>
-                            <h1 className="hero-font text-5xl md:text-6xl text-gray-900 tracking-tighter leading-none mb-1">
+                            <h1 className="hero-font text-4xl md:text-5xl lg:text-6xl text-gray-900 tracking-tighter leading-none mb-1">
                                 AUCTION <span className="text-orange-500">DASHBOARD</span>
                             </h1>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Franchise Overview</p>
+                            <p className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest">Franchise Overview</p>
                         </div>
                         {isPageLoading ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
@@ -235,7 +235,7 @@ function Auction() {
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 max-w-7xl mx-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 max-w-7xl mx-auto pb-10">
                                 {TEAMS.map(team => {
                                     const teamPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(team));
                                     const totalSpent = teamPlayers.reduce((sum, p) => sum + Number(p.bidAmount), 0);
