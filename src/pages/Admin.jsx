@@ -161,12 +161,11 @@ function Admin() {
         adminFetchInFlight.current = true;
         const startTime = performance.now();
         try {
-            // 1. Fetch Master Players, Team Bids, Teams, and Activity Logs
-            const [playersRes, bidsRes, teamsRes, logsRes] = await Promise.all([
+            // Keep the high-frequency auction refresh to the live roster tables.
+            const [playersRes, bidsRes, teamsRes] = await Promise.all([
                 supabase.from('players').select('*'),
                 supabase.from('team_bids').select('*'),
-                supabase.from('teams').select('*').order('display_order'),
-                supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200)
+                supabase.from('teams').select('*').order('display_order')
             ]);
 
             const latency = Math.max(1, Math.round(performance.now() - startTime));
@@ -231,18 +230,6 @@ function Admin() {
                 saveLocalTeams(teamsRes.data);
             }
 
-            // 4. Fetch Activity & Audit Logs from Supabase table
-            if (!logsRes.error && logsRes.data && Array.isArray(logsRes.data)) {
-                const mappedLogs = logsRes.data.map(l => ({
-                    id: l.id,
-                    type: l.action_type || l.type || 'SYSTEM',
-                    details: l.details || '',
-                    category: l.category || 'AUCTION',
-                    actor: l.actor || 'Admin',
-                    timestamp: l.created_at || new Date().toISOString()
-                }));
-                setAuditLogs(mappedLogs);
-            }
         } catch (err) {
             console.warn('[Sports Spectra] Error loading admin database data:', err);
         } finally {
@@ -254,16 +241,37 @@ function Admin() {
         }
     };
 
+    const loadAuditLogs = async () => {
+        try {
+            const { data, error } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200);
+            if (!error && Array.isArray(data)) {
+                const mappedLogs = data.map(l => ({
+                    id: l.id,
+                    type: l.action_type || l.type || 'SYSTEM',
+                    details: l.details || '',
+                    category: l.category || 'AUCTION',
+                    actor: l.actor || 'Admin',
+                    timestamp: l.created_at || new Date().toISOString()
+                }));
+                setAuditLogs(mappedLogs);
+            }
+        } catch (err) {
+            console.warn('[Sports Spectra] Error loading audit logs:', err);
+        }
+    };
+
     useEffect(() => {
         let isCancelled = false;
         const syncFromDb = async () => {
             if (isAuthenticated && !isCancelled) {
                 await loadData();
+                await loadAuditLogs();
             }
         };
         syncFromDb();
 
-        // Realtime is primary; keep a quick polling fallback only while its channel is down.
+        // Realtime is immediate when table publication is configured; polling also
+        // catches missed events and tables not included in the Supabase publication.
         let poll = null;
         const startFallbackPolling = () => {
             if (!poll) poll = setInterval(() => { if (isAuthenticated) loadData(); }, 1000);
@@ -288,10 +296,9 @@ function Admin() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_bids' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => loadData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => loadData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => loadAuditLogs())
             .subscribe(status => {
-                if (status === 'SUBSCRIBED') stopFallbackPolling();
-                else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) startFallbackPolling();
+                if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) startFallbackPolling();
             });
 
         window.addEventListener('storage', loadData);

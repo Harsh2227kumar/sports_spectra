@@ -20,7 +20,7 @@ function Auction() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isTeamLoading, setIsTeamLoading] = useState(false);
     const [hoveredTeam, setHoveredTeam] = useState(null);
-    const [_dbStatus, setDbStatus] = useState({ connected: false, latency: 0, message: '' });
+    const [dbStatus, setDbStatus] = useState({ connected: false, latency: 0, message: '' });
     const [auctionViewTab, setAuctionViewTab] = useState('franchises'); // 'franchises' | 'leaderboard'
     const [leaderboardSearch, setLeaderboardSearch] = useState('');
     const [leaderboardTeamFilter, setLeaderboardTeamFilter] = useState('ALL');
@@ -200,7 +200,8 @@ function Auction() {
             fetchAllAuctionData(false);
         }, 0);
 
-        // Realtime is primary; poll quickly only until its channel is healthy or if it disconnects.
+        // Realtime gives immediate updates; polling also covers tables not enabled for
+        // Realtime in Supabase and recovers quickly from missed events.
         let pollInterval = null;
         const startFallbackPolling = () => {
             if (!pollInterval) pollInterval = setInterval(() => fetchAllAuctionData(true), 1000);
@@ -220,9 +221,6 @@ function Auction() {
 
         // Instant refresh on credentials change
         const handleCredsChanged = () => {
-            const freshConfig = getSupabaseConfig();
-            setConfigInputUrl(freshConfig.url);
-            setConfigInputKey(freshConfig.key);
             fetchAllAuctionData(false);
         };
         window.addEventListener('supabase-credentials-changed', handleCredsChanged);
@@ -240,8 +238,7 @@ function Auction() {
                 fetchAllAuctionData(true);
             })
             .subscribe(status => {
-                if (status === 'SUBSCRIBED') stopFallbackPolling();
-                else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) startFallbackPolling();
+                if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) startFallbackPolling();
             });
 
         const handleStorageChange = () => {
@@ -548,6 +545,21 @@ function Auction() {
                             </div>
 
                             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                <span
+                                    title={dbStatus.message || 'Supabase query round-trip time'}
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-[10px] font-black uppercase tracking-wide ${
+                                        !dbStatus.connected
+                                            ? 'bg-red-50 text-red-700 border-red-200'
+                                            : dbStatus.latency < 200
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                : dbStatus.latency < 500
+                                                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                    : 'bg-red-50 text-red-700 border-red-200'
+                                    }`}
+                                >
+                                    <i className={`fa-solid ${isSyncing ? 'fa-spinner fa-spin' : 'fa-signal'}`}></i>
+                                    {dbStatus.connected ? `Ping ${dbStatus.latency} ms` : 'DB offline'}
+                                </span>
                                 {/* TAB SWITCHER */}
                                 <div className="bg-white/90 backdrop-blur-xs p-1 rounded-2xl border border-gray-200/90 shadow-2xs flex items-center gap-1">
                                     <button
