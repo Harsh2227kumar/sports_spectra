@@ -6,6 +6,8 @@ import {
 } from '../supabaseClient';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import PlayerAvatar from '../components/PlayerAvatar';
+import { formatPhotoUrl } from '../utils/photoUtils';
 
 function getNormalizedTeam(teamName) {
     return (teamName || '').toLowerCase().replace(/\s+/g, '');
@@ -140,7 +142,7 @@ function Auction() {
                     sports: p.sports || '',
                     phone: p.phone_no || p.phone || p.phone_number || '',
                     bidAmount: winningBid,
-                    photoUrl: p.photo_url || p.photoUrl || ''
+                    photoUrl: formatPhotoUrl(p.photo_url || p.photoUrl || '')
                 };
             });
 
@@ -272,12 +274,14 @@ function Auction() {
                     <i className={`fa-solid ${roleIcon}`}></i> {roleTitle}
                 </div>
                 <div className="flex flex-col items-center relative z-10">
-                    <div className={`w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-2xl sm:rounded-[32px] flex items-center justify-center text-3xl sm:text-4xl md:text-5xl font-black ${initialColor} shadow-inner mb-4 sm:mb-8 group-hover:scale-105 transition-transform duration-300 border border-black/5 overflow-hidden`} style={{ backgroundColor: bgColor || '#FF4500' }}>
-                        {leader.photo ? (
-                            <img src={leader.photo} className="w-full h-full object-cover" alt={leader.name} />
-                        ) : (
-                            leader.initials || (leader.name ? leader.name.slice(0, 2).toUpperCase() : 'LD')
-                        )}
+                    <div className={`w-28 h-28 sm:w-36 sm:h-36 md:w-40 md:h-40 rounded-2xl sm:rounded-[32px] flex items-center justify-center text-3xl sm:text-4xl md:text-5xl font-black ${initialColor} shadow-inner mb-4 sm:mb-8 group-hover:scale-105 transition-transform duration-300 border border-black/5 overflow-hidden relative`} style={{ backgroundColor: bgColor || '#FF4500' }}>
+                        <PlayerAvatar
+                            photoUrl={leader.photo}
+                            name={leader.name}
+                            containerClassName="w-full h-full flex items-center justify-center"
+                            className="w-full h-full object-cover"
+                            alt={leader.name}
+                        />
                     </div>
                     <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-center text-gray-900 leading-tight">{leader.name}</h3>
                     <p className="text-gray-400 font-bold uppercase text-[9px] sm:text-[10px] mt-1.5 sm:mt-2 tracking-widest">{leader.gender} &nbsp;|&nbsp; {roleTitle}</p>
@@ -904,13 +908,11 @@ function Auction() {
                                                                             </span>
 
                                                                             {/* Avatar */}
-                                                                            <div className="w-11 h-11 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-2xs">
-                                                                                {player.photoUrl ? (
-                                                                                    <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
-                                                                                ) : (
-                                                                                    player.name.charAt(0)
-                                                                                )}
-                                                                            </div>
+                                                                            <PlayerAvatar
+                                                                                photoUrl={player.photoUrl}
+                                                                                name={player.name}
+                                                                                containerClassName="w-11 h-11 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-2xs"
+                                                                            />
 
                                                                             <div className="min-w-0">
                                                                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -1015,13 +1017,11 @@ function Auction() {
 
                                                                                 <td className="px-5 py-4">
                                                                                     <div className="flex items-center gap-3">
-                                                                                        <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-2xs">
-                                                                                            {player.photoUrl ? (
-                                                                                                <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
-                                                                                            ) : (
-                                                                                                player.name.charAt(0)
-                                                                                            )}
-                                                                                        </div>
+                                                                                        <PlayerAvatar
+                                                                                            photoUrl={player.photoUrl}
+                                                                                            name={player.name}
+                                                                                            containerClassName="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-2xs"
+                                                                                        />
                                                                                         <div>
                                                                                             <div className="flex items-center gap-2">
                                                                                                 <span className="font-bold text-gray-900">{player.name}</span>
@@ -1249,13 +1249,11 @@ function Auction() {
                                                         {regulars.map(player => (
                                                             <div key={player.id} className="bg-gray-50/60 hover:bg-orange-50/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-100 transition group">
                                                                 <div className="flex items-center gap-3 sm:gap-4">
-                                                                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm sm:text-base shrink-0 overflow-hidden shadow-xs">
-                                                                        {player.photoUrl ? (
-                                                                            <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
-                                                                        ) : (
-                                                                            player.name.charAt(0)
-                                                                        )}
-                                                                    </div>
+                                                                    <PlayerAvatar
+                                                                        photoUrl={player.photoUrl}
+                                                                        name={player.name}
+                                                                        containerClassName="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm sm:text-base shrink-0 overflow-hidden shadow-xs"
+                                                                    />
                                                                     <div className="min-w-0">
                                                                         <div className="flex items-center gap-2 flex-wrap">
                                                                             <span className="font-bold text-gray-900 text-sm sm:text-base">{player.name}</span>

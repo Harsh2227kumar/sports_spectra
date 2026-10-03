@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ADMIN_IMPORT } from '../utils/paths';
+import { formatPhotoUrl } from '../utils/photoUtils';
 import { 
   supabase, 
   getLocalPlayersRegistry, 
@@ -47,7 +48,7 @@ function Admin() {
             section: p.section || '',
             sports: p.sports || '',
             phone: p.phone_no || p.phone || p.phone_number || '',
-            photoUrl: p.photo_url || p.photoUrl || ''
+            photoUrl: formatPhotoUrl(p.photo_url || p.photoUrl || '')
         }));
     });
 
@@ -205,7 +206,7 @@ function Admin() {
                     section: p.section || '',
                     sports: p.sports || '',
                     phone: p.phone_no || p.phone || p.phone_number || '',
-                    photoUrl: p.photo_url || p.photoUrl || ''
+                    photoUrl: formatPhotoUrl(p.photo_url || p.photoUrl || '')
                 }));
                 setMasterPlayers(mappedPlayers);
             }

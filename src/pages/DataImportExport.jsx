@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Papa from 'papaparse';
 import { ADMIN_BASE } from '../utils/paths';
+import { formatPhotoUrl } from '../utils/photoUtils';
 import {
   supabase,
   checkDatabaseConnection,
@@ -55,7 +56,7 @@ export default function DataImportExport() {
       sports: p.sports || '',
       phone: p.phone_no || p.phone || p.phone_number || '',
       phone_no: p.phone_no || p.phone || p.phone_number || '',
-      photo_url: p.photo_url || p.photoUrl || ''
+      photo_url: formatPhotoUrl(p.photo_url || p.photoUrl || '')
     }));
   });
 
@@ -166,7 +167,7 @@ export default function DataImportExport() {
           sports: p.sports || '',
           phone: p.phone_no || p.phone || p.phone_number || '',
           phone_no: p.phone_no || p.phone || p.phone_number || '',
-          photo_url: p.photo_url || p.photoUrl || ''
+          photo_url: formatPhotoUrl(p.photo_url || p.photoUrl || '')
         }));
         setAllPlayers(mapped);
         saveLocalPlayersRegistry(mapped);
@@ -270,7 +271,7 @@ export default function DataImportExport() {
             else if (k === 'sport 2' || k === 'sport2') {
               obj.sports = obj.sports ? `${obj.sports}, ${val}` : val;
             }
-            else if (k === 'photo' || k === 'photo url' || k === 'photourl' || k === 'image') obj.photo_url = val;
+            else if (k === 'photo' || k === 'photo url' || k === 'photourl' || k === 'image') obj.photo_url = formatPhotoUrl(val);
           }
 
           // Duplicate & Error checks
