@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   supabase, 
-  getLocalTeams, 
   saveLocalTeams, 
   getSupabaseConfig
 } from '../supabaseClient';
@@ -16,7 +15,7 @@ function Auction() {
     const [activeTeam, setActiveTeam] = useState(null);
     const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
     const [players, setPlayers] = useState([]);
-    const [teamsList, setTeamsList] = useState(() => getLocalTeams());
+    const [teamsList, setTeamsList] = useState([]);
     const [isPageLoading, setIsPageLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isTeamLoading, setIsTeamLoading] = useState(false);
@@ -85,6 +84,9 @@ function Auction() {
                             message: `Query error: ${anyError.message}`
                         });
                     }
+                    // Keep the last successful snapshot visible instead of replacing it
+                    // with empty data from a failed query.
+                    return;
                 } else {
                     setDbStatus({
                         connected: true,
@@ -96,7 +98,7 @@ function Auction() {
             }
 
             // 1. Process Teams from database
-            if (!teamsRes.error && teamsRes.data && teamsRes.data.length > 0) {
+            if (Array.isArray(teamsRes.data)) {
                 setTeamsList(teamsRes.data);
                 saveLocalTeams(teamsRes.data);
             }
