@@ -1,0 +1,8 @@
+{
+  "name": "Sports Spectra 4.0",
+  "description": "Live auction dashboard and franchise team roster management for the Sports Spectra 4.0 sports festival.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

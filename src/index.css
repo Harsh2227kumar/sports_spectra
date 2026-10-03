@@ -4,6 +4,8 @@ body {
     font-family: 'Plus Jakarta Sans', sans-serif; 
     background-color: #F3F4F6; 
     color: #111827; 
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
 }
 .hero-font { 
     font-family: 'Inter', sans-serif; 
@@ -14,7 +16,7 @@ body {
 
 /* Landing page styles */
 .bg-text-spectra {
-    font-size: 30vw;
+    font-size: clamp(4rem, 25vw, 30vw);
     line-height: 0.7;
     font-weight: 900;
     color: rgba(255, 255, 255, 0.07);
@@ -37,17 +39,16 @@ body {
 
 @media (max-width: 768px) {
     .bg-text-spectra {
-        font-size: 45vw;
-        bottom: 10%;
+        font-size: clamp(3rem, 35vw, 45vw);
+        bottom: 8%;
     }
-    .hero-font {
-        font-size: 15vw;
-        height: auto;
+    .clip-left, .clip-right {
+        clip-path: none !important;
     }
 }
 
 /* Scrollbar styling */
-::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #f97316; border-radius: 4px; }
 
