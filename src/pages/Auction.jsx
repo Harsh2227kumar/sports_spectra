@@ -107,19 +107,20 @@ function Auction() {
             const dbPlayers = playersRes.data || [];
             const dbBids = bidsRes.data || [];
 
-            // Map bids by player name (case-insensitive) and player id
+            // team_bids is the source of truth for drafted status and winning bids.
+            // players.team / players.bid_amount may be stale after a bid is deleted.
             const bidsByName = new Map();
             const bidsById = new Map();
             dbBids.forEach(b => {
-                if (b.player_name) bidsByName.set(b.player_name.trim().toLowerCase(), b);
                 if (b.player_id) bidsById.set(String(b.player_id), b);
+                if (b.player_name) bidsByName.set(b.player_name.trim().toLowerCase(), b);
             });
 
             const mappedData = dbPlayers.map(p => {
                 const nameKey = p.name ? p.name.trim().toLowerCase() : '';
-                const bid = bidsByName.get(nameKey) || bidsById.get(String(p.id));
-                const assignedTeam = bid?.team || (p.team && p.team !== 'UNSOLD' ? p.team : 'UNSOLD');
-                const winningBid = bid ? Number(bid.bid_amount || 0) : Number(p.bid_amount || 0);
+                const bid = bidsById.get(String(p.id)) || bidsByName.get(nameKey);
+                const assignedTeam = bid?.team || 'UNSOLD';
+                const winningBid = bid ? Number(bid.bid_amount || 0) : 0;
 
                 return {
                     id: p.id,
