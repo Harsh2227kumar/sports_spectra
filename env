@@ -1,0 +1,4 @@
+# Supabase Database Configuration
+# IMPORTANT: Use the ANON key (not service_role!) from Supabase Dashboard -> Settings -> API
+VITE_SUPABASE_URL=https://oqrkyrostpuswqkxkbsc.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xcmt5cm9zdHB1c3dxa3hrYnNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA5NjA0MzYsImV4cCI6MjEwNjUzNjQzNn0.yw5Z8isY4hKFu2qUKwiFLlsL5p3UwNqZnroEXZhic00
