@@ -347,7 +347,7 @@ function createMockSupabase() {
               } else if (tableName === 'teams') {
                 const teams = getLocalTeams();
                 resolve({ data: teams, error: null });
-              } else if (tableName === 'activity_logs') {
+              } else if (tableName === 'activity_logs' || tableName === 'audit_logs') {
                 const logs = getLocalActivityLogs();
                 resolve({ data: logs, error: null });
               } else {
@@ -386,7 +386,7 @@ function createMockSupabase() {
                 const updated = [...current, ...arr];
                 saveLocalTeams(updated);
                 resolve({ data: arr, error: null });
-              } else if (tableName === 'activity_logs') {
+              } else if (tableName === 'activity_logs' || tableName === 'audit_logs') {
                 const current = getLocalActivityLogs();
                 const newRecords = arr.map(r => ({
                   id: r.id || 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
@@ -457,7 +457,7 @@ function createMockSupabase() {
                     });
                     saveLocalTeams(updated);
                     resolve({ data: updated, error: null });
-                  } else if (tableName === 'activity_logs') {
+                  } else if (tableName === 'activity_logs' || tableName === 'audit_logs') {
                     resolve({ data: [], error: null });
                   } else {
                     const current = getLocalPlayersRegistry();
@@ -493,7 +493,7 @@ function createMockSupabase() {
                     const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
                     saveLocalTeams(updated);
                     resolve({ data: null, error: null });
-                  } else if (tableName === 'activity_logs') {
+                  } else if (tableName === 'activity_logs' || tableName === 'audit_logs') {
                     saveLocalActivityLogs([]);
                     channelCallbacks.forEach(cb => {
                       try { cb({ event: 'DELETE' }); } catch { }
@@ -514,7 +514,7 @@ function createMockSupabase() {
             neq(column, value) {
               return {
                 then(resolve) {
-                  if (tableName === 'activity_logs') {
+                  if (tableName === 'activity_logs' || tableName === 'audit_logs') {
                     saveLocalActivityLogs([]);
                     resolve({ data: null, error: null });
                   } else {
@@ -611,18 +611,19 @@ export async function testSupabaseConnection(testUrl, testKey) {
       auth: { persistSession: false }
     });
 
-    // Check tables: teams, players, team_bids, and activity_logs
-    const [teamsTest, playersTest, bidsTest, logsTest] = await Promise.all([
+    // Check tables: teams, players, bids, and both log tables
+    const [teamsTest, playersTest, bidsTest, logsTest, auditTest] = await Promise.all([
       tempClient.from('teams').select('id, name').limit(5),
       tempClient.from('players').select('id, name').limit(1),
       tempClient.from('team_bids').select('id').limit(1),
-      tempClient.from('activity_logs').select('id').limit(1)
+      tempClient.from('activity_logs').select('id').limit(1),
+      tempClient.from('audit_logs').select('id').limit(1)
     ]);
 
     const latency = Math.max(1, Math.round(performance.now() - start));
 
     // Check for authorization or invalid key error
-    const authError = [teamsTest.error, playersTest.error, bidsTest.error, logsTest.error].find(e =>
+    const authError = [teamsTest.error, playersTest.error, bidsTest.error, logsTest.error, auditTest.error].find(e =>
       e && (e.code === 'PGRST301' || e.message?.includes('JWT') || e.message?.includes('apikey') || e.code === '401' || e.code === '403')
     );
     if (authError) {
@@ -648,6 +649,9 @@ export async function testSupabaseConnection(testUrl, testKey) {
     if (logsTest.error?.message?.includes('does not exist') || logsTest.error?.message?.includes('relation')) {
       missingTables.push('activity_logs');
     }
+    if (auditTest.error?.message?.includes('does not exist') || auditTest.error?.message?.includes('relation')) {
+      missingTables.push('audit_logs');
+    }
 
     if (missingTables.length > 0) {
       return {
@@ -665,7 +669,7 @@ export async function testSupabaseConnection(testUrl, testKey) {
       latency,
       hasMissingTables: false,
       teamCount,
-      message: `Successfully connected to Supabase in ${latency}ms! Verified teams (${teamCount}), players, bids, and activity_logs tables.`
+      message: `Successfully connected to Supabase in ${latency}ms! Verified teams (${teamCount}), players, bids, activity_logs, and audit_logs tables.`
     };
   } catch (err) {
     const latency = Math.round(performance.now() - start);
@@ -727,18 +731,31 @@ export async function logActivityToSupabase({ action_type, category = 'AUCTION',
 
   try {
     const client = getActiveSupabaseClient();
-    const { data, error } = await client.from('activity_logs').insert([{
+    const activityRecord = {
       action_type: logItem.action_type,
       category: logItem.category,
       details: logItem.details,
       actor: logItem.actor,
       metadata: logItem.metadata
-    }]).select();
+    };
+    const [{ data, error }, auditResult] = await Promise.all([
+      client.from('activity_logs').insert([activityRecord]).select(),
+      client.from('audit_logs').insert([{
+        action_type: logItem.action_type,
+        category: logItem.category,
+        actor: logItem.actor,
+        details: logItem.details,
+        metadata: logItem.metadata
+      }]).select()
+    ]);
 
     if (error) {
       console.warn('[Sports Spectra] Supabase activity log insert notice:', error.message);
     }
-    return { success: !error, data };
+    if (auditResult.error) {
+      console.warn('[Sports Spectra] Supabase audit log insert notice:', auditResult.error.message);
+    }
+    return { success: !error && !auditResult.error, data, auditData: auditResult.data, error: error || auditResult.error };
   } catch (err) {
     console.warn('[Sports Spectra] Activity log error:', err);
     return { success: false, error: err };
@@ -774,8 +791,11 @@ export async function clearActivityLogsInSupabase() {
   saveLocalActivityLogs([]);
   try {
     const client = getActiveSupabaseClient();
-    await client.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    return { success: true };
+    const [activityResult, auditResult] = await Promise.all([
+      client.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      client.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    ]);
+    return { success: !activityResult.error && !auditResult.error, error: activityResult.error || auditResult.error };
   } catch (err) {
     console.warn('[Sports Spectra] Failed to clear activity logs in Supabase:', err);
     return { success: false, error: err };
@@ -866,17 +886,33 @@ create table if not exists activity_logs (
 create index if not exists idx_activity_logs_created_at on activity_logs (created_at desc);
 create index if not exists idx_activity_logs_action on activity_logs (action_type);
 
+-- Dedicated audit trail, kept separately from the user-facing activity feed
+create table if not exists audit_logs (
+  id uuid default gen_random_uuid() primary key,
+  action_type text not null,
+  category text not null default 'AUCTION',
+  actor text not null default 'Admin',
+  details text not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+create index if not exists idx_audit_logs_created_at on audit_logs (created_at desc);
+create index if not exists idx_audit_logs_action on audit_logs (action_type);
+
 -- 5. ROW LEVEL SECURITY (RLS) POLICIES
 alter table players enable row level security;
 alter table team_bids enable row level security;
 alter table teams enable row level security;
 alter table activity_logs enable row level security;
+alter table audit_logs enable row level security;
 
 -- Public read policies
 create policy "Anyone can read players" on players for select using (true);
 create policy "Anyone can read team_bids" on team_bids for select using (true);
 create policy "Anyone can read teams" on teams for select using (true);
 create policy "Anyone can read activity_logs" on activity_logs for select using (true);
+drop policy if exists "Anyone can read audit_logs" on audit_logs;
+create policy "Anyone can read audit_logs" on audit_logs for select using (true);
 
 -- Admin modification policies
 create policy "Admins can insert players" on players for insert with check (true);
@@ -893,12 +929,17 @@ create policy "Admins can delete teams" on teams for delete using (true);
 
 create policy "Admins can insert activity_logs" on activity_logs for insert with check (true);
 create policy "Admins can delete activity_logs" on activity_logs for delete using (true);
+drop policy if exists "Admins can insert audit_logs" on audit_logs;
+create policy "Admins can insert audit_logs" on audit_logs for insert with check (true);
+drop policy if exists "Admins can delete audit_logs" on audit_logs;
+create policy "Admins can delete audit_logs" on audit_logs for delete using (true);
 
 -- 6. ENABLE REALTIME BROADCASTING
 alter publication supabase_realtime add table players;
 alter publication supabase_realtime add table team_bids;
 alter publication supabase_realtime add table teams;
-alter publication supabase_realtime add table activity_logs;`;
+alter publication supabase_realtime add table activity_logs;
+alter publication supabase_realtime add table audit_logs;`;
 
 // --- Security Utilities ---
 

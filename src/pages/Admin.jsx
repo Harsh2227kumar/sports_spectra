@@ -96,7 +96,7 @@ function Admin() {
     const [configInputUrl, setConfigInputUrl] = useState(() => getSupabaseConfig().url);
     const [configInputKey, setConfigInputKey] = useState(() => getSupabaseConfig().key);
 
-    // Activity Audit Logs state (Saved in Supabase activity_logs table)
+    // Audit log state (Saved in the dedicated Supabase audit_logs table)
     const [auditLogs, setAuditLogs] = useState(() => {
         return getLocalActivityLogs().map(l => ({
             id: l.id || 'log-' + Math.random().toString(36).substring(2, 6),
@@ -156,7 +156,7 @@ function Admin() {
                 supabase.from('players').select('*'),
                 supabase.from('team_bids').select('*'),
                 supabase.from('teams').select('*').order('display_order'),
-                supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(200)
+                supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(200)
             ]);
 
             const latency = Math.max(1, Math.round(performance.now() - startTime));
@@ -264,7 +264,7 @@ function Admin() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_bids' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => loadData())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, () => loadData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => loadData())
             .subscribe();
 
         window.addEventListener('storage', loadData);
@@ -1023,13 +1023,13 @@ function Admin() {
                                     <h3 className="text-xl font-black text-gray-900">Activity & Audit Logs</h3>
                                     <span className="bg-orange-100 text-orange-700 text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
                                         <i className="fa-solid fa-database text-[10px]"></i>
-                                        <span>supabase: activity_logs</span>
+                                        <span>supabase: audit_logs</span>
                                     </span>
                                     <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">
                                         {filteredLogs.length} Records
                                     </span>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-0.5">Real-time audit trail permanently saved in Supabase database</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Real-time audit trail saved in the dedicated Supabase audit_logs table</p>
                             </div>
                         </div>
 
