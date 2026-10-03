@@ -9,7 +9,11 @@ import {
   saveLocalTeams,
   updateCustomSupabaseCredentials,
   getSupabaseConfig,
-  sanitizeCsvCell
+  sanitizeCsvCell,
+  logActivityToSupabase,
+  fetchActivityLogsFromSupabase,
+  clearActivityLogsInSupabase,
+  getLocalActivityLogs
 } from '../supabaseClient';
 
 function Admin() {
@@ -42,6 +46,7 @@ function Admin() {
             year: p.year || '',
             section: p.section || '',
             sports: p.sports || '',
+            phone: p.phone_no || p.phone || p.phone_number || '',
             photoUrl: p.photo_url || p.photoUrl || ''
         }));
     });
@@ -91,47 +96,54 @@ function Admin() {
     const [configInputUrl, setConfigInputUrl] = useState(() => getSupabaseConfig().url);
     const [configInputKey, setConfigInputKey] = useState(() => getSupabaseConfig().key);
 
-    // Activity Audit Logs state
+    // Activity Audit Logs state (Saved in Supabase activity_logs table)
     const [auditLogs, setAuditLogs] = useState(() => {
-        try {
-            const stored = localStorage.getItem('sports_spectra_audit_logs');
-            return stored ? JSON.parse(stored) : [];
-        } catch {
-            return [];
-        }
+        return getLocalActivityLogs().map(l => ({
+            id: l.id || 'log-' + Math.random().toString(36).substring(2, 6),
+            type: l.action_type || l.type || 'SYSTEM',
+            details: l.details || '',
+            category: l.category || 'AUCTION',
+            actor: l.actor || 'Admin',
+            timestamp: l.created_at || l.timestamp || new Date().toISOString()
+        }));
     });
     const [logFilter, setLogFilter] = useState('ALL');
     const [logSearch, setLogSearch] = useState('');
+    const [isSavingLog, setIsSavingLog] = useState(false);
 
-    const addLogEntry = (actionType, details, category = 'DATA') => {
+    const addLogEntry = async (actionType, details, category = 'AUCTION') => {
         const newLog = {
             id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
             type: actionType,
             details: details,
             category: category,
+            actor: 'Admin',
             timestamp: new Date().toISOString()
         };
-        setAuditLogs(prev => {
-            const updated = [newLog, ...prev].slice(0, 300);
-            try {
-                localStorage.setItem('sports_spectra_audit_logs', JSON.stringify(updated));
-            } catch {}
-            return updated;
-        });
+        setAuditLogs(prev => [newLog, ...prev].slice(0, 300));
+        setIsSavingLog(true);
+        try {
+            await logActivityToSupabase({
+                action_type: actionType,
+                category: category,
+                details: details,
+                actor: 'Admin'
+            });
+        } finally {
+            setIsSavingLog(false);
+        }
     };
 
-    const handleClearLogs = () => {
+    const handleClearLogs = async () => {
         setAuditLogs([]);
-        try {
-            localStorage.removeItem('sports_spectra_audit_logs');
-        } catch {}
+        await clearActivityLogsInSupabase();
     };
 
     const filteredLogs = auditLogs.filter(log => {
         const matchesType = logFilter === 'ALL' || log.type === logFilter;
         const matchesSearch = !logSearch.trim() || 
-            log.details.toLowerCase().includes(logSearch.toLowerCase()) || 
-            log.type.toLowerCase().includes(logSearch.toLowerCase());
+            (log.details || '').toLowerCase().includes(logSearch.toLowerCase()) || 
+            (log.type || '').toLowerCase().includes(logSearch.toLowerCase());
         return matchesType && matchesSearch;
     });
 
@@ -139,11 +151,12 @@ function Admin() {
     const loadData = async () => {
         const startTime = performance.now();
         try {
-            // 1. Fetch Master Players (Personal details)
-            const [playersRes, bidsRes, teamsRes] = await Promise.all([
+            // 1. Fetch Master Players, Team Bids, Teams, and Activity Logs
+            const [playersRes, bidsRes, teamsRes, logsRes] = await Promise.all([
                 supabase.from('players').select('*'),
                 supabase.from('team_bids').select('*'),
-                supabase.from('teams').select('*').order('display_order')
+                supabase.from('teams').select('*').order('display_order'),
+                supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(200)
             ]);
 
             const latency = Math.max(1, Math.round(performance.now() - startTime));
@@ -181,6 +194,7 @@ function Admin() {
                     year: p.year || '',
                     section: p.section || '',
                     sports: p.sports || '',
+                    phone: p.phone_no || p.phone || p.phone_number || '',
                     photoUrl: p.photo_url || p.photoUrl || ''
                 }));
                 setMasterPlayers(mappedPlayers);
@@ -203,6 +217,19 @@ function Admin() {
             if (!teamsRes.error && teamsRes.data && teamsRes.data.length > 0) {
                 setTeamsList(teamsRes.data);
                 saveLocalTeams(teamsRes.data);
+            }
+
+            // 4. Fetch Activity & Audit Logs from Supabase table
+            if (!logsRes.error && logsRes.data && Array.isArray(logsRes.data)) {
+                const mappedLogs = logsRes.data.map(l => ({
+                    id: l.id,
+                    type: l.action_type || l.type || 'SYSTEM',
+                    details: l.details || '',
+                    category: l.category || 'AUCTION',
+                    actor: l.actor || 'Admin',
+                    timestamp: l.created_at || new Date().toISOString()
+                }));
+                setAuditLogs(mappedLogs);
             }
         } catch (err) {
             console.warn('[Sports Spectra] Error loading admin database data:', err);
@@ -237,6 +264,7 @@ function Admin() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_bids' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => loadData())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, () => loadData())
             .subscribe();
 
         window.addEventListener('storage', loadData);
@@ -673,8 +701,13 @@ function Admin() {
                                                         </div>
                                                         <div>
                                                             <div className="font-bold text-gray-900 text-sm">{player.name}</div>
-                                                            <div className="text-[11px] text-gray-500">
-                                                                {player.gender} &bull; {player.sports || 'All-rounder'} &bull; Yr: {player.year || 'N/A'}
+                                                            <div className="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
+                                                                <span>{player.gender} &bull; {player.sports || 'All-rounder'} &bull; Yr: {player.year || 'N/A'}</span>
+                                                                {player.phone && (
+                                                                    <span className="text-orange-600 font-bold bg-orange-100/70 px-1.5 py-0.2 rounded text-[10px] inline-flex items-center gap-1">
+                                                                        <i className="fa-solid fa-phone text-[9px]"></i> {player.phone}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -689,7 +722,7 @@ function Admin() {
 
                                 {/* SELECTED PLAYER PREVIEW CARD */}
                                 {selectedPlayerObj && (
-                                    <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-4 flex items-center justify-between">
+                                    <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                         <div className="flex items-center gap-3">
                                             <div className="w-12 h-12 rounded-xl bg-white text-orange-600 border border-orange-200 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden">
                                                 {selectedPlayerObj.photoUrl ? (
@@ -699,18 +732,28 @@ function Admin() {
                                                 )}
                                             </div>
                                             <div>
-                                                <div className="font-black text-gray-900 text-sm flex items-center gap-2">
-                                                    {selectedPlayerObj.name}
+                                                <div className="font-black text-gray-900 text-sm flex items-center gap-2 flex-wrap">
+                                                    <span>{selectedPlayerObj.name}</span>
                                                     <span className="bg-white text-gray-600 border border-gray-200 text-[10px] px-1.5 py-0.2 rounded font-bold">
                                                         {selectedPlayerObj.gender}
                                                     </span>
+                                                    {selectedPlayerObj.phone && (
+                                                        <a
+                                                            href={`tel:${selectedPlayerObj.phone}`}
+                                                            className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 bg-white hover:bg-orange-100 border border-orange-200 px-2 py-0.5 rounded-md transition"
+                                                            title={`Call ${selectedPlayerObj.name}`}
+                                                        >
+                                                            <i className="fa-solid fa-phone text-[10px]"></i>
+                                                            <span>{selectedPlayerObj.phone}</span>
+                                                        </a>
+                                                    )}
                                                 </div>
                                                 <div className="text-xs text-gray-600 mt-0.5">
                                                     Year: <strong>{selectedPlayerObj.year || 'N/A'}</strong> | Sec: <strong>{selectedPlayerObj.section || 'N/A'}</strong> | Sport: <strong>{selectedPlayerObj.sports || 'All'}</strong>
                                                 </div>
                                             </div>
                                         </div>
-                                        <Link to={ADMIN_IMPORT} className="text-[11px] font-bold text-orange-600 hover:text-orange-700 underline shrink-0">
+                                        <Link to={ADMIN_IMPORT} className="text-[11px] font-bold text-orange-600 hover:text-orange-700 underline shrink-0 self-start sm:self-auto">
                                             Edit Details
                                         </Link>
                                     </div>
@@ -851,37 +894,50 @@ function Admin() {
                         <>
                             {/* MOBILE CARD VIEW (< md) */}
                             <div className="md:hidden divide-y divide-gray-100">
-                                {teamBids.map(bid => (
-                                    <div key={bid.id} className="p-4 flex flex-col gap-2.5 hover:bg-gray-50/60 transition">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div>
-                                                <h4 className="font-bold text-gray-900 text-sm">{bid.playerName}</h4>
+                                {teamBids.map(bid => {
+                                    const pObj = masterPlayers.find(p => p.name.toLowerCase() === bid.playerName.toLowerCase());
+                                    const phone = pObj?.phone || '';
+
+                                    return (
+                                        <div key={bid.id} className="p-4 flex flex-col gap-2.5 hover:bg-gray-50/60 transition">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div>
+                                                    <h4 className="font-bold text-gray-900 text-sm">{bid.playerName}</h4>
+                                                    {phone ? (
+                                                        <a href={`tel:${phone}`} className="inline-flex items-center gap-1.5 text-xs text-orange-600 font-bold mt-1 bg-orange-50 px-2 py-0.5 rounded-md hover:bg-orange-100 transition">
+                                                            <i className="fa-solid fa-phone text-[10px]"></i>
+                                                            <span>{phone}</span>
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[11px] text-gray-400 font-medium">No contact</span>
+                                                    )}
+                                                </div>
+                                                <span className="text-base font-black text-orange-600">
+                                                    ₹{Number(bid.bidAmount || 0).toLocaleString('en-IN')}
+                                                </span>
                                             </div>
-                                            <span className="text-base font-black text-orange-600">
-                                                ₹{Number(bid.bidAmount || 0).toLocaleString('en-IN')}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center justify-between pt-1">
-                                            <span className="bg-orange-100 text-orange-800 text-[11px] font-bold px-2.5 py-0.5 rounded-lg">
-                                                {bid.team}
-                                            </span>
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    onClick={() => handleEditBid(bid)}
-                                                    className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-600 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-                                                >
-                                                    <i className="fa-solid fa-pen text-[10px]"></i> Edit
-                                                </button>
-                                                <button
-                                                    onClick={() => setDeleteConfirmBid(bid)}
-                                                    className="px-3 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-                                                >
-                                                    <i className="fa-solid fa-trash text-[10px]"></i> Delete
-                                                </button>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <span className="bg-orange-100 text-orange-800 text-[11px] font-bold px-2.5 py-0.5 rounded-lg">
+                                                    {bid.team}
+                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleEditBid(bid)}
+                                                        className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-700 hover:text-orange-600 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                                                    >
+                                                        <i className="fa-solid fa-pen text-[10px]"></i> Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setDeleteConfirmBid(bid)}
+                                                        className="px-3 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                                                    >
+                                                        <i className="fa-solid fa-trash text-[10px]"></i> Delete
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             {/* DESKTOP TABLE VIEW (>= md) */}
@@ -890,44 +946,64 @@ function Admin() {
                                     <thead className="text-[10px] uppercase tracking-widest text-gray-400 bg-gray-50 border-b border-gray-100">
                                         <tr>
                                             <th className="px-6 py-4 font-bold">Player Name</th>
+                                            <th className="px-6 py-4 font-bold">Contact / Phone</th>
                                             <th className="px-6 py-4 font-bold">Team</th>
                                             <th className="px-6 py-4 font-bold text-right">Bid Amount</th>
                                             <th className="px-6 py-4 font-bold text-center">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {teamBids.map(bid => (
-                                            <tr key={bid.id} className="hover:bg-gray-50/80 transition">
-                                                <td className="px-6 py-4 font-bold text-gray-900">{bid.playerName}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2.5 py-1 rounded-lg">
-                                                        {bid.team}
-                                                    </span>
-                                                </td>
+                                        {teamBids.map(bid => {
+                                            const pObj = masterPlayers.find(p => p.name.toLowerCase() === bid.playerName.toLowerCase());
+                                            const phone = pObj?.phone || '';
 
-                                                <td className="px-6 py-4 font-black text-gray-900 text-right">
-                                                    ₹{Number(bid.bidAmount || 0).toLocaleString('en-IN')}
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        <button
-                                                            onClick={() => handleEditBid(bid)}
-                                                            className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-orange-600 flex items-center justify-center transition cursor-pointer"
-                                                            title="Edit Bid"
-                                                        >
-                                                            <i className="fa-solid fa-pen text-xs"></i>
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setDeleteConfirmBid(bid)}
-                                                            className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center transition cursor-pointer"
-                                                            title="Delete Bid"
-                                                        >
-                                                            <i className="fa-solid fa-trash text-xs"></i>
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                            return (
+                                                <tr key={bid.id} className="hover:bg-gray-50/80 transition">
+                                                    <td className="px-6 py-4 font-bold text-gray-900">{bid.playerName}</td>
+                                                    <td className="px-6 py-4">
+                                                        {phone ? (
+                                                            <a
+                                                                href={`tel:${phone}`}
+                                                                className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-700 bg-gray-50 hover:bg-orange-50 hover:text-orange-600 px-2.5 py-1 rounded-lg border border-gray-200 hover:border-orange-300 transition"
+                                                                title={`Call ${bid.playerName}`}
+                                                            >
+                                                                <i className="fa-solid fa-phone text-orange-500 text-[10px]"></i>
+                                                                <span>{phone}</span>
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-gray-300 text-xs italic">Not Provided</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2.5 py-1 rounded-lg">
+                                                            {bid.team}
+                                                        </span>
+                                                    </td>
+
+                                                    <td className="px-6 py-4 font-black text-gray-900 text-right">
+                                                        ₹{Number(bid.bidAmount || 0).toLocaleString('en-IN')}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            <button
+                                                                onClick={() => handleEditBid(bid)}
+                                                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-orange-100 text-gray-600 hover:text-orange-600 flex items-center justify-center transition cursor-pointer"
+                                                                title="Edit Bid"
+                                                            >
+                                                                <i className="fa-solid fa-pen text-xs"></i>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setDeleteConfirmBid(bid)}
+                                                                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600 flex items-center justify-center transition cursor-pointer"
+                                                                title="Delete Bid"
+                                                            >
+                                                                <i className="fa-solid fa-trash text-xs"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -943,13 +1019,17 @@ function Admin() {
                                 <i className="fa-solid fa-list-check"></i>
                             </div>
                             <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     <h3 className="text-xl font-black text-gray-900">Activity & Audit Logs</h3>
-                                    <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2.5 py-0.5 rounded-full">
-                                        {filteredLogs.length} Entries
+                                    <span className="bg-orange-100 text-orange-700 text-xs font-black px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                                        <i className="fa-solid fa-database text-[10px]"></i>
+                                        <span>supabase: activity_logs</span>
+                                    </span>
+                                    <span className="bg-gray-100 text-gray-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                                        {filteredLogs.length} Records
                                     </span>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-0.5">Real-time audit record of data entered, updated, and deleted</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Real-time audit trail permanently saved in Supabase database</p>
                             </div>
                         </div>
 

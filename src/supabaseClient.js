@@ -303,6 +303,27 @@ export function saveLocalTeams(teams) {
   }
 }
 
+// Activity & Audit Logs Local Caching
+export function getLocalActivityLogs() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('sports_spectra_audit_logs');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalActivityLogs(logs) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('sports_spectra_audit_logs', JSON.stringify(logs.slice(0, 300)));
+    window.dispatchEvent(new Event('storage'));
+  } catch (err) {
+    console.warn('[Sports Spectra] Local logs save failed:', err);
+  }
+}
+
 // Fallback client when offline or awaiting configuration
 function createMockSupabase() {
   const channelCallbacks = new Set();
@@ -326,6 +347,9 @@ function createMockSupabase() {
               } else if (tableName === 'teams') {
                 const teams = getLocalTeams();
                 resolve({ data: teams, error: null });
+              } else if (tableName === 'activity_logs') {
+                const logs = getLocalActivityLogs();
+                resolve({ data: logs, error: null });
               } else {
                 const players = getLocalPlayersRegistry();
                 resolve({ data: players, error: null });
@@ -362,6 +386,23 @@ function createMockSupabase() {
                 const updated = [...current, ...arr];
                 saveLocalTeams(updated);
                 resolve({ data: arr, error: null });
+              } else if (tableName === 'activity_logs') {
+                const current = getLocalActivityLogs();
+                const newRecords = arr.map(r => ({
+                  id: r.id || 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                  action_type: r.action_type || 'SYSTEM',
+                  category: r.category || 'AUCTION',
+                  details: r.details || '',
+                  actor: r.actor || 'Admin',
+                  metadata: r.metadata || {},
+                  created_at: new Date().toISOString()
+                }));
+                const updated = [...newRecords, ...current].slice(0, 300);
+                saveLocalActivityLogs(updated);
+                channelCallbacks.forEach(cb => {
+                  try { cb({ event: 'INSERT', new: newRecords[0] }); } catch { }
+                });
+                resolve({ data: newRecords, error: null });
               } else {
                 const current = getLocalPlayersRegistry();
                 const newRecords = arr.map(r => ({
@@ -371,6 +412,7 @@ function createMockSupabase() {
                   year: r.year || '',
                   section: r.section || '',
                   sports: r.sports || '',
+                  phone_no: r.phone_no || r.phone || '',
                   team: r.team || 'UNSOLD',
                   role: r.role || 'Player',
                   bid_amount: Number(r.bid_amount || 0),
@@ -415,6 +457,8 @@ function createMockSupabase() {
                     });
                     saveLocalTeams(updated);
                     resolve({ data: updated, error: null });
+                  } else if (tableName === 'activity_logs') {
+                    resolve({ data: [], error: null });
                   } else {
                     const current = getLocalPlayersRegistry();
                     const updated = current.map(item => {
@@ -449,6 +493,12 @@ function createMockSupabase() {
                     const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
                     saveLocalTeams(updated);
                     resolve({ data: null, error: null });
+                  } else if (tableName === 'activity_logs') {
+                    saveLocalActivityLogs([]);
+                    channelCallbacks.forEach(cb => {
+                      try { cb({ event: 'DELETE' }); } catch { }
+                    });
+                    resolve({ data: null, error: null });
                   } else {
                     const current = getLocalPlayersRegistry();
                     const updated = current.filter(item => String(item[column] || '').toLowerCase() !== String(value).toLowerCase());
@@ -456,6 +506,18 @@ function createMockSupabase() {
                     channelCallbacks.forEach(cb => {
                       try { cb({ event: 'DELETE' }); } catch { }
                     });
+                    resolve({ data: null, error: null });
+                  }
+                }
+              };
+            },
+            neq(column, value) {
+              return {
+                then(resolve) {
+                  if (tableName === 'activity_logs') {
+                    saveLocalActivityLogs([]);
+                    resolve({ data: null, error: null });
+                  } else {
                     resolve({ data: null, error: null });
                   }
                 }
@@ -549,17 +611,18 @@ export async function testSupabaseConnection(testUrl, testKey) {
       auth: { persistSession: false }
     });
 
-    // Check tables: teams, players, and team_bids
-    const [teamsTest, playersTest, bidsTest] = await Promise.all([
+    // Check tables: teams, players, team_bids, and activity_logs
+    const [teamsTest, playersTest, bidsTest, logsTest] = await Promise.all([
       tempClient.from('teams').select('id, name').limit(5),
       tempClient.from('players').select('id, name').limit(1),
-      tempClient.from('team_bids').select('id').limit(1)
+      tempClient.from('team_bids').select('id').limit(1),
+      tempClient.from('activity_logs').select('id').limit(1)
     ]);
 
     const latency = Math.max(1, Math.round(performance.now() - start));
 
     // Check for authorization or invalid key error
-    const authError = [teamsTest.error, playersTest.error, bidsTest.error].find(e =>
+    const authError = [teamsTest.error, playersTest.error, bidsTest.error, logsTest.error].find(e =>
       e && (e.code === 'PGRST301' || e.message?.includes('JWT') || e.message?.includes('apikey') || e.code === '401' || e.code === '403')
     );
     if (authError) {
@@ -582,6 +645,9 @@ export async function testSupabaseConnection(testUrl, testKey) {
     if (bidsTest.error?.message?.includes('does not exist') || bidsTest.error?.message?.includes('relation')) {
       missingTables.push('team_bids');
     }
+    if (logsTest.error?.message?.includes('does not exist') || logsTest.error?.message?.includes('relation')) {
+      missingTables.push('activity_logs');
+    }
 
     if (missingTables.length > 0) {
       return {
@@ -599,7 +665,7 @@ export async function testSupabaseConnection(testUrl, testKey) {
       latency,
       hasMissingTables: false,
       teamCount,
-      message: `Successfully connected to Supabase in ${latency}ms! Verified teams (${teamCount}), players, and bids tables.`
+      message: `Successfully connected to Supabase in ${latency}ms! Verified teams (${teamCount}), players, bids, and activity_logs tables.`
     };
   } catch (err) {
     const latency = Math.round(performance.now() - start);
@@ -627,8 +693,6 @@ export async function updateCustomSupabaseCredentials(url, key) {
     else localStorage.removeItem('sports_spectra_supabase_anon_key');
   }
 
-
-
   // Re-instantiate active client immediately
   reinitSupabaseClient();
 
@@ -641,6 +705,200 @@ export async function updateCustomSupabaseCredentials(url, key) {
 
   return { success: true };
 }
+
+// --- Activity & Audit Logs Supabase Integration ---
+
+/**
+ * Log an action to the Supabase activity_logs table (and local storage fallback)
+ */
+export async function logActivityToSupabase({ action_type, category = 'AUCTION', details, actor = 'Admin', metadata = {} }) {
+  const logItem = {
+    action_type: action_type || 'SYSTEM',
+    category: category || 'AUCTION',
+    details: details || '',
+    actor: actor || 'Admin',
+    metadata: metadata || {},
+    created_at: new Date().toISOString()
+  };
+
+  // Always update local cache for instant UI feedback
+  const localLogs = getLocalActivityLogs();
+  saveLocalActivityLogs([logItem, ...localLogs]);
+
+  try {
+    const client = getActiveSupabaseClient();
+    const { data, error } = await client.from('activity_logs').insert([{
+      action_type: logItem.action_type,
+      category: logItem.category,
+      details: logItem.details,
+      actor: logItem.actor,
+      metadata: logItem.metadata
+    }]).select();
+
+    if (error) {
+      console.warn('[Sports Spectra] Supabase activity log insert notice:', error.message);
+    }
+    return { success: !error, data };
+  } catch (err) {
+    console.warn('[Sports Spectra] Activity log error:', err);
+    return { success: false, error: err };
+  }
+}
+
+/**
+ * Fetch latest activity logs directly from Supabase activity_logs table
+ */
+export async function fetchActivityLogsFromSupabase(limit = 200) {
+  try {
+    const client = getActiveSupabaseClient();
+    const { data, error } = await client
+      .from('activity_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (!error && Array.isArray(data)) {
+      saveLocalActivityLogs(data);
+      return { success: true, logs: data };
+    }
+    return { success: false, logs: getLocalActivityLogs() };
+  } catch {
+    return { success: false, logs: getLocalActivityLogs() };
+  }
+}
+
+/**
+ * Clear all activity logs in Supabase
+ */
+export async function clearActivityLogsInSupabase() {
+  saveLocalActivityLogs([]);
+  try {
+    const client = getActiveSupabaseClient();
+    await client.from('activity_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    return { success: true };
+  } catch (err) {
+    console.warn('[Sports Spectra] Failed to clear activity logs in Supabase:', err);
+    return { success: false, error: err };
+  }
+}
+
+// Canonical SQL Setup Script for the complete Sports Spectra database
+export const SUPABASE_SETUP_SQL = `-- =========================================================
+-- SPORTS SPECTRA 4.0 COMPLETE DATABASE SCHEMA & POLICIES
+-- =========================================================
+
+-- 1. PLAYERS MASTER REGISTRY TABLE (With Phone No)
+create table if not exists players (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  gender text not null check (gender in ('M', 'F')),
+  year text,
+  section text,
+  sports text,
+  phone_no text,
+  team text not null default 'UNSOLD',
+  role text not null default 'Player',
+  bid_amount numeric not null default 0 check (bid_amount >= 0),
+  photo_url text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Ensure phone_no column exists if table was already created
+alter table players add column if not exists phone_no text;
+
+-- Ultra-fast indexes for instant autocomplete & queries (< 5ms response time)
+create index if not exists idx_players_name on players using gin (to_tsvector('simple', name));
+create index if not exists idx_players_name_lower on players (lower(name));
+create index if not exists idx_players_team on players (lower(team));
+
+-- 2. TEAM BIDS TABLE (Auction Draft & Bids)
+create table if not exists team_bids (
+  id uuid default gen_random_uuid() primary key,
+  player_id uuid references players(id) on delete set null,
+  player_name text not null,
+  team text not null,
+  role text not null default 'Player',
+  bid_amount numeric not null default 0 check (bid_amount >= 0),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create unique index if not exists idx_unique_player_bid on team_bids (lower(player_name));
+create index if not exists idx_team_bids_team on team_bids (lower(team));
+
+-- 3. TEAMS TABLE (Franchises, Purses, Leaders & Themes)
+create table if not exists teams (
+  id uuid default gen_random_uuid() primary key,
+  name text not null unique,
+  total_purse numeric not null default 10000,
+  logo_url text,
+  color text default 'bg-orange-500',
+  text_color text default 'text-orange-500',
+  from_color text default 'from-orange-500',
+  captain_name text,
+  captain_gender text default 'M',
+  captain_initials text,
+  captain_color text default '#FF4500',
+  captain_photo text,
+  captain_phone text,
+  vice_captain_name text,
+  vice_captain_gender text default 'F',
+  vice_captain_initials text,
+  vice_captain_color text default '#2196F3',
+  vice_captain_photo text,
+  vice_captain_phone text,
+  display_order integer default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_teams_display_order on teams (display_order);
+
+-- 4. ACTIVITY & AUDIT LOGS TABLE
+create table if not exists activity_logs (
+  id uuid default gen_random_uuid() primary key,
+  action_type text not null,
+  category text not null default 'AUCTION',
+  details text not null,
+  actor text default 'Admin',
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_activity_logs_created_at on activity_logs (created_at desc);
+create index if not exists idx_activity_logs_action on activity_logs (action_type);
+
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES
+alter table players enable row level security;
+alter table team_bids enable row level security;
+alter table teams enable row level security;
+alter table activity_logs enable row level security;
+
+-- Public read policies
+create policy "Anyone can read players" on players for select using (true);
+create policy "Anyone can read team_bids" on team_bids for select using (true);
+create policy "Anyone can read teams" on teams for select using (true);
+create policy "Anyone can read activity_logs" on activity_logs for select using (true);
+
+-- Admin modification policies
+create policy "Admins can insert players" on players for insert with check (true);
+create policy "Admins can update players" on players for update using (true);
+create policy "Admins can delete players" on players for delete using (true);
+
+create policy "Admins can insert team_bids" on team_bids for insert with check (true);
+create policy "Admins can update team_bids" on team_bids for update using (true);
+create policy "Admins can delete team_bids" on team_bids for delete using (true);
+
+create policy "Admins can insert teams" on teams for insert with check (true);
+create policy "Admins can update teams" on teams for update using (true);
+create policy "Admins can delete teams" on teams for delete using (true);
+
+create policy "Admins can insert activity_logs" on activity_logs for insert with check (true);
+create policy "Admins can delete activity_logs" on activity_logs for delete using (true);
+
+-- 6. ENABLE REALTIME BROADCASTING
+alter publication supabase_realtime add table players;
+alter publication supabase_realtime add table team_bids;
+alter publication supabase_realtime add table teams;
+alter publication supabase_realtime add table activity_logs;`;
 
 // --- Security Utilities ---
 

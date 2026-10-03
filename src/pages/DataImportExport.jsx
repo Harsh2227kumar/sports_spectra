@@ -12,7 +12,9 @@ import {
   saveLocalTeams,
   updateCustomSupabaseCredentials,
   getSupabaseConfig,
-  sanitizeCsvCell
+  sanitizeCsvCell,
+  logActivityToSupabase,
+  SUPABASE_SETUP_SQL
 } from '../supabaseClient';
 
 export default function DataImportExport() {
@@ -52,6 +54,8 @@ export default function DataImportExport() {
       year: p.year || '',
       section: p.section || '',
       sports: p.sports || '',
+      phone: p.phone_no || p.phone || p.phone_number || '',
+      phone_no: p.phone_no || p.phone || p.phone_number || '',
       photo_url: p.photo_url || p.photoUrl || ''
     }));
   });
@@ -76,6 +80,7 @@ export default function DataImportExport() {
     year: '',
     section: '',
     sports: '',
+    phone_no: '',
     photo_url: ''
   });
   const [showEditConfirmModal, setShowEditConfirmModal] = useState(false);
@@ -135,6 +140,12 @@ export default function DataImportExport() {
       setTeamsList(nextTeams);
       saveLocalTeams(nextTeams);
 
+      await logActivityToSupabase({
+        action_type: 'UPDATED',
+        category: 'FRANCHISE',
+        details: `Updated team configuration for ${selectedTeamConfig.name}`
+      });
+
       setTeamConfigSuccessMsg(`Configuration for ${selectedTeamConfig.name} saved to database!`);
       setTimeout(() => setTeamConfigSuccessMsg(null), 4000);
       window.dispatchEvent(new Event('storage'));
@@ -154,6 +165,8 @@ export default function DataImportExport() {
           year: p.year || '',
           section: p.section || '',
           sports: p.sports || '',
+          phone: p.phone_no || p.phone || p.phone_number || '',
+          phone_no: p.phone_no || p.phone || p.phone_number || '',
           photo_url: p.photo_url || p.photoUrl || ''
         }));
         setAllPlayers(mapped);
@@ -232,6 +245,7 @@ export default function DataImportExport() {
             year: '',
             section: '',
             sports: '',
+            phone: '',
             photo_url: '',
             status: 'valid',
             messages: []
@@ -247,6 +261,9 @@ export default function DataImportExport() {
             }
             else if (k === 'year' || k === 'yr' || k === 'batch') obj.year = val;
             else if (k === 'section' || k === 'sec') obj.section = val;
+            else if (k === 'phone' || k === 'phone no' || k === 'phone_no' || k === 'phoneno' || k === 'phone number' || k === 'mobile' || k === 'mobile no' || k === 'contact' || k === 'contact no') {
+              obj.phone = val;
+            }
             else if (k === 'sport' || k === 'sport 1' || k === 'sport1' || k === 'sports') {
               obj.sports = obj.sports ? `${obj.sports}, ${val}` : val;
             }
@@ -315,6 +332,7 @@ export default function DataImportExport() {
             year: row.year,
             section: row.section,
             sports: row.sports,
+            phone_no: row.phone || '',
             photo_url: row.photo_url,
             team: 'UNSOLD',
             role: 'Player',
@@ -327,6 +345,7 @@ export default function DataImportExport() {
             year: row.year,
             section: row.section,
             sports: row.sports,
+            phone_no: row.phone || '',
             photo_url: row.photo_url
           });
         }
@@ -343,16 +362,27 @@ export default function DataImportExport() {
 
       if (rowsToUpdate.length > 0) {
         for (const r of rowsToUpdate) {
-          await supabase.from('players').update({
+          const updatePayload = {
             gender: r.gender,
             year: r.year,
             section: r.section,
             sports: r.sports,
             photo_url: r.photo_url
-          }).eq('name', r.name);
+          };
+          if (r.phone_no) {
+            updatePayload.phone_no = r.phone_no;
+          }
+          await supabase.from('players').update(updatePayload).eq('name', r.name);
           updatedCount++;
         }
       }
+
+      // Log to Supabase Activity Logs table
+      await logActivityToSupabase({
+        action_type: 'ENTERED',
+        category: 'IMPORT',
+        details: `Imported ${insertedCount} new players and updated ${updatedCount} players via CSV`
+      });
 
       // Reload database
       await loadPlayersFromDb();
@@ -391,6 +421,7 @@ export default function DataImportExport() {
       Year: sanitizeCsvCell(p.year),
       Section: sanitizeCsvCell(p.section),
       Sports: sanitizeCsvCell(p.sports),
+      Phone_No: sanitizeCsvCell(p.phone_no || p.phone || ''),
       Photo_URL: sanitizeCsvCell(p.photo_url || '')
     })));
 
@@ -438,6 +469,7 @@ export default function DataImportExport() {
       year: player.year || '',
       section: player.section || '',
       sports: player.sports || '',
+      phone_no: player.phone_no || player.phone || '',
       photo_url: player.photo_url || ''
     });
     setEditSuccessMessage(null);
@@ -460,6 +492,7 @@ export default function DataImportExport() {
         year: editFormData.year.trim(),
         section: editFormData.section.trim(),
         sports: editFormData.sports.trim(),
+        phone_no: editFormData.phone_no.trim(),
         photo_url: editFormData.photo_url.trim()
       };
 
@@ -470,6 +503,13 @@ export default function DataImportExport() {
         .eq('name', selectedPlayer.name);
 
       if (error) throw error;
+
+      // Log to Supabase Activity Logs table
+      await logActivityToSupabase({
+        action_type: 'UPDATED',
+        category: 'REGISTRY',
+        details: `Updated personal details for player ${updatedFields.name}`
+      });
 
       // Update local storage
       const currentList = getLocalPlayersRegistry();
@@ -699,7 +739,7 @@ export default function DataImportExport() {
                   {csvFile ? csvFile.name : 'Click to upload or drag & drop CSV file'}
                 </h4>
                 <p className="text-xs text-gray-400 mt-1">
-                  Supported columns: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Name</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Gender</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Year</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Section</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Sports</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Photo URL</code>
+                  Supported columns: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Name</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Gender</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Phone No</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Year</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Section</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Sports</code>, <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-600 font-mono">Photo URL</code>
                 </p>
               </div>
 
@@ -763,6 +803,7 @@ export default function DataImportExport() {
                           <th className="p-3">#</th>
                           <th className="p-3">Name</th>
                           <th className="p-3">Gender</th>
+                          <th className="p-3">Contact / Phone</th>
                           <th className="p-3">Yr/Sec</th>
                           <th className="p-3">Sports</th>
                           <th className="p-3">Validation Status</th>
@@ -771,7 +812,7 @@ export default function DataImportExport() {
                       <tbody className="divide-y divide-gray-100 font-medium">
                         {filteredPreviewRows.length === 0 ? (
                           <tr>
-                            <td colSpan="6" className="p-6 text-center text-gray-400">No rows matching this filter.</td>
+                            <td colSpan="7" className="p-6 text-center text-gray-400">No rows matching this filter.</td>
                           </tr>
                         ) : (
                           filteredPreviewRows.map((r, i) => (
@@ -779,6 +820,15 @@ export default function DataImportExport() {
                               <td className="p-3 text-gray-400">{r._rowNumber}</td>
                               <td className="p-3 font-bold text-gray-900">{r.name || '<Empty>'}</td>
                               <td className="p-3">{r.gender}</td>
+                              <td className="p-3">
+                                {r.phone ? (
+                                  <span className="font-mono text-orange-600 font-bold bg-orange-50 px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1">
+                                    <i className="fa-solid fa-phone text-[9px]"></i> {r.phone}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-300 italic text-[11px]">None</span>
+                                )}
+                              </td>
                               <td className="p-3">{r.year || '-'} / {r.section || '-'}</td>
                               <td className="p-3 max-w-[140px] truncate">{r.sports || '-'}</td>
                               <td className="p-3">
@@ -1175,6 +1225,17 @@ export default function DataImportExport() {
                   </div>
 
                   <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Phone Number</label>
+                    <input
+                      type="tel"
+                      value={editFormData.phone_no}
+                      onChange={(e) => setEditFormData({ ...editFormData, phone_no: e.target.value })}
+                      placeholder="e.g. +91 9876543210"
+                      className="w-full bg-white border border-gray-200 rounded-xl p-3 text-sm font-semibold focus:outline-none focus:border-orange-500 font-mono"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Photo URL</label>
                     <input
                       type="url"
@@ -1267,6 +1328,7 @@ export default function DataImportExport() {
 
             <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-xs mb-6 flex flex-col gap-1.5">
               <div><span className="text-gray-400">Gender:</span> <strong className="text-gray-800">{editFormData.gender}</strong></div>
+              <div><span className="text-gray-400">Phone No:</span> <strong className="text-gray-800">{editFormData.phone_no || 'None'}</strong></div>
               <div><span className="text-gray-400">Batch / Section:</span> <strong className="text-gray-800">{editFormData.year || '-'} / {editFormData.section || '-'}</strong></div>
               <div><span className="text-gray-400">Sports:</span> <strong className="text-gray-800">{editFormData.sports || '-'}</strong></div>
             </div>
@@ -1307,225 +1369,15 @@ export default function DataImportExport() {
               <p className="text-gray-500 mb-3">
                 Run this SQL in your Supabase SQL Editor for the fastest response times, dedicated table separation, and realtime synchronization:
               </p>
-              <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl font-mono text-[11px] overflow-x-auto selection:bg-orange-500">
-                {`-- 1. Create players master table (Personal details)
-create table if not exists players (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  gender text not null check (gender in ('M', 'F')),
-  year text,
-  section text,
-  sports text,
-  photo_url text,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- Fast Index for player autocomplete searches
-create index if not exists idx_players_name on players using gin (to_tsvector('simple', name));
-create index if not exists idx_players_name_lower on players (lower(name));
-
--- 2. Create team_bids table (Auction Bids / Draft Records)
-create table if not exists team_bids (
-  id uuid default gen_random_uuid() primary key,
-  player_id uuid references players(id) on delete set null,
-  player_name text not null,
-  team text not null,
-  role text not null default 'Player',
-  bid_amount numeric not null default 0 check (bid_amount >= 0),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- Prevent duplicate drafting of the same player
-create unique index if not exists idx_unique_player_bid on team_bids (lower(player_name));
-create index if not exists idx_team_bids_team on team_bids (team);
-
--- Enable Row Level Security (RLS)
-alter table players enable row level security;
-alter table team_bids enable row level security;
-
--- Policies
-create policy "Anyone can read players" on players for select using (true);
-create policy "Anyone can read team_bids" on team_bids for select using (true);
-
-create policy "Public/Admin can insert players" on players for insert with check (true);
-create policy "Public/Admin can update players" on players for update using (true);
-create policy "Public/Admin can delete players" on players for delete using (true);
-
-create policy "Public/Admin can insert team_bids" on team_bids for insert with check (true);
-create policy "Public/Admin can update team_bids" on team_bids for update using (true);
-create policy "Public/Admin can delete team_bids" on team_bids for delete using (true);
-
--- Enable Realtime
-alter publication supabase_realtime add table players;
-alter publication supabase_realtime add table team_bids;
-
--- 3. Create teams table (Franchises, Purses, Theme, and Leaders)
-create table if not exists teams (
-  id uuid default gen_random_uuid() primary key,
-  name text not null unique,
-  total_purse numeric not null default 10000,
-  logo_url text,
-  color text default 'bg-orange-500',
-  text_color text default 'text-orange-500',
-  from_color text default 'from-orange-500',
-  captain_name text,
-  captain_gender text default 'M',
-  captain_initials text,
-  captain_color text default '#FF4500',
-  captain_photo text,
-  vice_captain_name text,
-  vice_captain_gender text default 'F',
-  vice_captain_initials text,
-  vice_captain_color text default '#2196F3',
-  vice_captain_photo text,
-  display_order integer default 0,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create index if not exists idx_teams_display_order on teams (display_order);
-
--- 4. Enable Row Level Security (RLS)
-alter table players enable row level security;
-alter table team_bids enable row level security;
-alter table teams enable row level security;
-
--- Public read policies (Fastest cached CDN queries for public dashboards)
-create policy "Anyone can read players" on players for select using (true);
-create policy "Anyone can read team_bids" on team_bids for select using (true);
-create policy "Anyone can read teams" on teams for select using (true);
-
--- Admin / App write policies
-create policy "Admins can insert players" on players for insert with check (true);
-create policy "Admins can update players" on players for update using (true);
-create policy "Admins can delete players" on players for delete using (true);
-
-create policy "Admins can insert team_bids" on team_bids for insert with check (true);
-create policy "Admins can update team_bids" on team_bids for update using (true);
-create policy "Admins can delete team_bids" on team_bids for delete using (true);
-
-create policy "Admins can insert teams" on teams for insert with check (true);
-create policy "Admins can update teams" on teams for update using (true);
-create policy "Admins can delete teams" on teams for delete using (true);
-
--- 5. Insert / Update Official Franchises & Retained Leaders
-insert into teams (name, total_purse, logo_url, color, text_color, from_color, captain_name, captain_gender, captain_initials, captain_color, captain_photo, vice_captain_name, vice_captain_gender, vice_captain_initials, vice_captain_color, vice_captain_photo, display_order)
-values 
-  ('Team 1', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'SHRIYA YERANE', 'F', 'SY', '#2196F3', '', 1),
-  ('Team 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Shrusti Kale', 'F', 'SK', '#BA68C8', '', 2),
-  ('Team 3', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
-  ('Team 4', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
-  ('Team 5', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
-  ('Team 6', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
-  ('Team 7', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
-  ('Team 8', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
-on conflict (name) do nothing;
-
--- 6. Enable Realtime Broadcasting
-alter publication supabase_realtime add table players;
-alter publication supabase_realtime add table team_bids;
-alter publication supabase_realtime add table teams;`}
+              <pre className="bg-gray-900 text-gray-100 p-4 rounded-xl font-mono text-[11px] overflow-x-auto selection:bg-orange-500 max-h-[60vh]">
+                {SUPABASE_SETUP_SQL}
               </pre>
             </div>
 
             <div className="pt-4 border-t border-gray-200 flex justify-end gap-3">
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`-- 1. Create players master table (Personal details & draft status)
-create table if not exists players (
-  id uuid default gen_random_uuid() primary key,
-  name text not null,
-  gender text not null check (gender in ('M', 'F')),
-  year text,
-  section text,
-  sports text,
-  team text not null default 'UNSOLD',
-  role text not null default 'Player',
-  bid_amount numeric not null default 0 check (bid_amount >= 0),
-  photo_url text,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create index if not exists idx_players_name on players using gin (to_tsvector('simple', name));
-create index if not exists idx_players_name_lower on players (lower(name));
-create index if not exists idx_players_team on players (lower(team));
-
--- 2. Create team_bids table (Auction Bids / Draft Records)
-create table if not exists team_bids (
-  id uuid default gen_random_uuid() primary key,
-  player_id uuid references players(id) on delete set null,
-  player_name text not null,
-  team text not null,
-  role text not null default 'Player',
-  bid_amount numeric not null default 0 check (bid_amount >= 0),
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create unique index if not exists idx_unique_player_bid on team_bids (lower(player_name));
-create index if not exists idx_team_bids_team on team_bids (lower(team));
-
--- 3. Create teams table (Franchises, Purses, Theme, and Leaders)
-create table if not exists teams (
-  id uuid default gen_random_uuid() primary key,
-  name text not null unique,
-  total_purse numeric not null default 10000,
-  logo_url text,
-  color text default 'bg-orange-500',
-  text_color text default 'text-orange-500',
-  from_color text default 'from-orange-500',
-  captain_name text,
-  captain_gender text default 'M',
-  captain_initials text,
-  captain_color text default '#FF4500',
-  captain_photo text,
-  vice_captain_name text,
-  vice_captain_gender text default 'F',
-  vice_captain_initials text,
-  vice_captain_color text default '#2196F3',
-  vice_captain_photo text,
-  display_order integer default 0,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-create index if not exists idx_teams_display_order on teams (display_order);
-
--- 4. Enable Row Level Security (RLS)
-alter table players enable row level security;
-alter table team_bids enable row level security;
-alter table teams enable row level security;
-
-create policy "Anyone can read players" on players for select using (true);
-create policy "Anyone can read team_bids" on team_bids for select using (true);
-create policy "Anyone can read teams" on teams for select using (true);
-
-create policy "Admins can insert players" on players for insert with check (true);
-create policy "Admins can update players" on players for update using (true);
-create policy "Admins can delete players" on players for delete using (true);
-
-create policy "Admins can insert team_bids" on team_bids for insert with check (true);
-create policy "Admins can update team_bids" on team_bids for update using (true);
-create policy "Admins can delete team_bids" on team_bids for delete using (true);
-
-create policy "Admins can insert teams" on teams for insert with check (true);
-create policy "Admins can update teams" on teams for update using (true);
-create policy "Admins can delete teams" on teams for delete using (true);
-
--- 5. Insert / Update Official Franchises & Retained Leaders
-insert into teams (name, total_purse, logo_url, color, text_color, from_color, captain_name, captain_gender, captain_initials, captain_color, captain_photo, vice_captain_name, vice_captain_gender, vice_captain_initials, vice_captain_color, vice_captain_photo, display_order)
-values 
-  ('Team 1', 10000, '/logo1.png', 'bg-orange-500', 'text-orange-500', 'from-orange-500', 'Atharva Anil Masharkar', 'M', 'AM', '#D6CFCB', '', 'SHRIYA YERANE', 'F', 'SY', '#2196F3', '', 1),
-  ('Team 2', 10000, '/logo2.png', 'bg-blue-600', 'text-blue-600', 'from-blue-600', 'Chaitanya Kharpate', 'M', 'CK', '#FFB74D', '', 'Shrusti Kale', 'F', 'SK', '#BA68C8', '', 2),
-  ('Team 3', 10000, '/logo3.png', 'bg-red-600', 'text-red-600', 'from-red-600', 'Karan Deshmukh', 'M', 'KD', '#4DB6AC', '', 'Sejal Lende', 'F', 'SL', '#F06292', '', 3),
-  ('Team 4', 10000, '/logo4.png', 'bg-purple-600', 'text-purple-600', 'from-purple-600', 'Ranvir Thakur', 'M', 'RT', '#7986CB', '', 'Radhika Sapate', 'F', 'RS', '#FF8A65', '', 4),
-  ('Team 5', 10000, '/logo5.png', 'bg-green-600', 'text-green-600', 'from-green-600', 'Arnav Sakharkar', 'M', 'AS', '#E65100', '', 'Ritisha Naigaonkar', 'F', 'RN', '#0277BD', '', 5),
-  ('Team 6', 10000, '/logo6.png', 'bg-yellow-600', 'text-yellow-600', 'from-yellow-600', 'Manthan Gujar', 'M', 'MG', '#D84315', '', 'Aarya Raut', 'F', 'AR', '#C5E1A5', '', 6),
-  ('Team 7', 10000, '/logo7.png', 'bg-pink-600', 'text-pink-600', 'from-pink-600', 'Parth tiwaskar', 'M', 'PT', '#A1887F', '', 'Janhavi Admane', 'F', 'JA', '#F48FB1', '', 7),
-  ('Team 8', 10000, '/logo8.png', 'bg-cyan-600', 'text-cyan-600', 'from-cyan-600', 'Shervin Peter', 'M', 'SP', '#90A4AE', '', 'Gauri Savale', 'F', 'GS', '#FFD54F', '', 8)
-on conflict (name) do nothing;
-
--- 6. Enable Realtime Broadcasting
-alter publication supabase_realtime add table players;
-alter publication supabase_realtime add table team_bids;
-alter publication supabase_realtime add table teams;`);
+                  navigator.clipboard.writeText(SUPABASE_SETUP_SQL);
                   setImportNotification({ type: 'success', message: 'Official SQL schema & team commands copied to clipboard!' });
                   setShowSqlModal(false);
                 }}

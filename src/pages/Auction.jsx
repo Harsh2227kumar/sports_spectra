@@ -3,9 +3,7 @@ import {
   supabase, 
   getLocalTeams, 
   saveLocalTeams, 
-  testSupabaseConnection,
-  getSupabaseConfig,
-  updateCustomSupabaseCredentials
+  getSupabaseConfig
 } from '../supabaseClient';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -23,7 +21,13 @@ function Auction() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isTeamLoading, setIsTeamLoading] = useState(false);
     const [hoveredTeam, setHoveredTeam] = useState(null);
-    const [dbStatus, setDbStatus] = useState({ connected: false, latency: 0, message: '' });
+    const [_dbStatus, setDbStatus] = useState({ connected: false, latency: 0, message: '' });
+    const [auctionViewTab, setAuctionViewTab] = useState('franchises'); // 'franchises' | 'leaderboard'
+    const [leaderboardSearch, setLeaderboardSearch] = useState('');
+    const [leaderboardTeamFilter, setLeaderboardTeamFilter] = useState('ALL');
+    const [leaderboardGenderFilter, setLeaderboardGenderFilter] = useState('ALL');
+    const [leaderboardSortBy, setLeaderboardSortBy] = useState('bid_desc');
+    const [copiedPhone, setCopiedPhone] = useState(null);
 
 
     const handleTeamClick = (teamName) => {
@@ -124,6 +128,7 @@ function Auction() {
                     year: p.year || '',
                     section: p.section || '',
                     sports: p.sports || '',
+                    phone: p.phone_no || p.phone || p.phone_number || '',
                     bidAmount: winningBid,
                     photoUrl: p.photo_url || p.photoUrl || ''
                 };
@@ -142,6 +147,7 @@ function Auction() {
                         year: '',
                         section: '',
                         sports: '',
+                        phone: b.phone || '',
                         bidAmount: Number(b.bid_amount || 0),
                         photoUrl: ''
                     });
@@ -254,7 +260,19 @@ function Auction() {
                     </div>
                     <h3 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-center text-gray-900 leading-tight">{leader.name}</h3>
                     <p className="text-gray-400 font-bold uppercase text-[9px] sm:text-[10px] mt-1.5 sm:mt-2 tracking-widest">{leader.gender} &nbsp;|&nbsp; {roleTitle}</p>
-                    <div className="mt-5 sm:mt-8 bg-orange-50 border border-orange-100 px-6 sm:px-8 py-2 sm:py-2.5 rounded-full flex items-center gap-2 shadow-xs">
+                    
+                    {leader.phone && (
+                        <a
+                            href={`tel:${leader.phone}`}
+                            className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-bold text-gray-800 bg-white/95 hover:bg-white border border-gray-200 hover:border-orange-300 px-3.5 py-1.5 rounded-full shadow-2xs hover:text-orange-600 transition"
+                            title={`Call ${leader.name}: ${leader.phone}`}
+                        >
+                            <i className="fa-solid fa-phone text-orange-500 text-[10px]"></i>
+                            <span className="font-mono">{leader.phone}</span>
+                        </a>
+                    )}
+
+                    <div className="mt-4 sm:mt-6 bg-orange-50 border border-orange-100 px-6 sm:px-8 py-2 sm:py-2.5 rounded-full flex items-center gap-2 shadow-xs">
                         <i className="fa-solid fa-circle-check text-orange-500"></i>
                         <span className="text-orange-500 font-black text-[10px] sm:text-xs uppercase tracking-widest">
                             {roleTitle === 'CAPTAIN' ? 'OWNER' : roleTitle === 'VICE CAPTAIN' ? 'CO OWNER' : 'OWNER'}
@@ -301,12 +319,20 @@ function Auction() {
             {/* MOBILE QUICK FRANCHISE SWITCHER BAR (Screens < lg) */}
             <div className="lg:hidden bg-white border-b border-gray-200 px-3 sm:px-4 py-2 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar shrink-0 shadow-xs z-20">
                 <button
-                    onClick={() => setActiveTeam(null)}
+                    onClick={() => { setActiveTeam(null); setAuctionViewTab('franchises'); }}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
-                        !activeTeam ? 'bg-orange-500 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        !activeTeam && auctionViewTab === 'franchises' ? 'bg-orange-500 text-white shadow-xs' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
-                    <i className="fa-solid fa-grip text-[10px]"></i> All Teams
+                    <i className="fa-solid fa-grip text-[10px]"></i> Franchises
+                </button>
+                <button
+                    onClick={() => { setActiveTeam(null); setAuctionViewTab('leaderboard'); }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                        !activeTeam && auctionViewTab === 'leaderboard' ? 'bg-amber-500 text-white shadow-xs' : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
+                    }`}
+                >
+                    <i className="fa-solid fa-trophy text-[10px] text-amber-500"></i> Leaderboard ({players.filter(p => p.team && p.team !== 'UNSOLD').length})
                 </button>
                 {teamsList.map(teamObj => {
                     const isSelected = activeTeam === teamObj.name;
@@ -343,7 +369,7 @@ function Auction() {
                     style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover' }}
                 >
                     <div className="p-5 flex items-center justify-between border-b border-white/10">
-                        <div className="hero-font text-white text-base leading-none cursor-pointer" onClick={() => { setActiveTeam(null); setMobileDrawerOpen(false); }}>
+                        <div className="hero-font text-white text-base leading-none cursor-pointer" onClick={() => { setActiveTeam(null); setAuctionViewTab('franchises'); setMobileDrawerOpen(false); }}>
                             SPORTS<br /><span className="text-orange-500">SPECTRA 4.0</span>
                         </div>
                         <button 
@@ -355,22 +381,34 @@ function Auction() {
                     </div>
 
                     <nav className="flex-1 overflow-y-auto no-scrollbar py-3">
-                        {activeTeam ? (
-                            <button 
-                                onClick={() => { setActiveTeam(null); setMobileDrawerOpen(false); }} 
-                                className="w-[calc(100%-24px)] text-left text-orange-400 bg-white/5 hover:bg-white/10 transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-sm cursor-pointer"
-                            >
-                                <i className="fa-solid fa-house-chimney w-5 text-center"></i> All Franchises
-                            </button>
-                        ) : (
-                            <Link 
-                                to="/" 
-                                onClick={() => setMobileDrawerOpen(false)}
-                                className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-sm cursor-pointer"
-                            >
-                                <i className="fa-solid fa-arrow-left w-5 text-center"></i> Back to main website
-                            </Link>
-                        )}
+                        <button 
+                            onClick={() => { setActiveTeam(null); setAuctionViewTab('franchises'); setMobileDrawerOpen(false); }} 
+                            className={`w-[calc(100%-24px)] text-left transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-sm cursor-pointer ${
+                                !activeTeam && auctionViewTab === 'franchises' ? 'bg-orange-500 text-white font-bold' : 'text-[#9CA3AF] hover:bg-white/5 hover:text-white'
+                            }`}
+                        >
+                            <i className="fa-solid fa-house-chimney w-5 text-center"></i> All Franchises
+                        </button>
+
+                        <button 
+                            onClick={() => { setActiveTeam(null); setAuctionViewTab('leaderboard'); setMobileDrawerOpen(false); }} 
+                            className={`w-[calc(100%-24px)] text-left transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-sm cursor-pointer ${
+                                !activeTeam && auctionViewTab === 'leaderboard' ? 'bg-amber-500 text-white font-bold' : 'text-amber-400 hover:bg-white/5'
+                            }`}
+                        >
+                            <i className="fa-solid fa-trophy w-5 text-center text-amber-400"></i> Auction Leaderboard
+                            <span className="ml-auto text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
+                                {players.filter(p => p.team && p.team !== 'UNSOLD').length}
+                            </span>
+                        </button>
+
+                        <Link 
+                            to="/" 
+                            onClick={() => setMobileDrawerOpen(false)}
+                            className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-3 my-1 px-4 py-2.5 flex items-center gap-3 font-semibold text-sm cursor-pointer"
+                        >
+                            <i className="fa-solid fa-arrow-left w-5 text-center"></i> Back to main website
+                        </Link>
 
                         <div className="px-6 mt-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
                             Franchises ({teamsList.length})
@@ -391,29 +429,47 @@ function Auction() {
                             </button>
                         ))}
                     </nav>
-
-
                 </aside>
             </div>
 
             {/* DESKTOP SIDEBAR (Screens >= lg) */}
             <aside className="hidden lg:flex flex-col shrink-0 w-64 xl:w-72" style={{ background: "url('/left-navbar.png') no-repeat center center", backgroundSize: 'cover', transition: 'all 0.3s' }}>
                 <div className="p-8">
-                    <div className="hero-font text-white text-lg leading-none cursor-pointer" onClick={() => setActiveTeam(null)}>
+                    <div className="hero-font text-white text-lg leading-none cursor-pointer" onClick={() => { setActiveTeam(null); setAuctionViewTab('franchises'); }}>
                         SPORTS<br /><span className="text-orange-500">SPECTRA 4.0</span>
                     </div>
                 </div>
                 
                 <nav className="flex-1 mt-4 overflow-y-auto no-scrollbar" onMouseLeave={() => setHoveredTeam(null)}>
-                    {activeTeam ? (
-                        <a onClick={() => setActiveTeam(null)} className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-4 my-1 px-4 py-3 flex items-center gap-3 font-semibold text-sm cursor-pointer">
-                            <i className="fa-solid fa-house-chimney w-5 text-center"></i> Dashboard
-                        </a>
-                    ) : (
-                        <Link to="/" className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-4 my-1 px-4 py-3 flex items-center gap-3 font-semibold text-sm cursor-pointer">
-                            <i className="fa-solid fa-arrow-left w-5 text-center"></i> Back to main website
-                        </Link>
-                    )}
+                    <a 
+                        onClick={() => { setActiveTeam(null); setAuctionViewTab('franchises'); }} 
+                        className={`relative block transition-colors rounded-xl mx-4 my-1 px-4 py-3 cursor-pointer group ${
+                            !activeTeam && auctionViewTab === 'franchises' ? 'bg-[#FF6B00] text-white font-bold shadow-md' : 'text-[#9CA3AF] hover:bg-white/5 hover:text-white'
+                        }`}
+                    >
+                        <span className="relative z-10 flex items-center gap-3 font-semibold text-sm">
+                            <i className="fa-solid fa-house-chimney w-5 text-center"></i> Franchises
+                        </span>
+                    </a>
+
+                    <a 
+                        onClick={() => { setActiveTeam(null); setAuctionViewTab('leaderboard'); }} 
+                        className={`relative block transition-colors rounded-xl mx-4 my-1 px-4 py-3 cursor-pointer group ${
+                            !activeTeam && auctionViewTab === 'leaderboard' ? 'bg-amber-500 text-white font-bold shadow-md' : 'text-[#9CA3AF] hover:bg-white/5 hover:text-white'
+                        }`}
+                    >
+                        <span className="relative z-10 flex items-center gap-3 font-semibold text-sm">
+                            <i className="fa-solid fa-trophy w-5 text-center text-amber-400"></i> Auction Leaderboard
+                            <span className="ml-auto text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
+                                {players.filter(p => p.team && p.team !== 'UNSOLD').length}
+                            </span>
+                        </span>
+                    </a>
+
+                    <Link to="/" className="text-[#9CA3AF] hover:bg-white/5 hover:text-white transition-all rounded-xl mx-4 my-1 px-4 py-3 flex items-center gap-3 font-semibold text-sm cursor-pointer">
+                        <i className="fa-solid fa-arrow-left w-5 text-center"></i> Back to main website
+                    </Link>
+
                     <div className="px-8 mt-4 mb-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Franchises ({teamsList.length})</div>
                     
                     {teamsList.map(teamObj => (
@@ -442,7 +498,7 @@ function Auction() {
                 
                 {!activeTeam ? (
                     <div className="p-3.5 sm:p-6 md:p-10 flex-1 relative z-10 w-full max-w-7xl mx-auto">
-                        <div className="mb-6 sm:mb-8 md:mb-12 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                        <div className="mb-6 sm:mb-8 md:mb-10 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
                             <div>
                                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                                     <div className="w-6 sm:w-8 h-1 bg-orange-500 rounded-full"></div>
@@ -460,119 +516,552 @@ function Auction() {
                                     </span>
                                 </div>
                                 <h1 className="hero-font text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-gray-900 tracking-tight leading-none mb-1">
-                                    AUCTION <span className="text-orange-500">DASHBOARD</span>
+                                    AUCTION <span className="text-orange-500">{auctionViewTab === 'leaderboard' ? 'LEADERBOARD' : 'DASHBOARD'}</span>
                                 </h1>
                                 <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                    Real-time Franchise Standings & Budget
+                                    {auctionViewTab === 'leaderboard' ? 'All Drafted Players, Winning Bids & Contacts' : 'Real-time Franchise Standings & Budget'}
                                 </p>
                             </div>
 
                             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                {/* TAB SWITCHER */}
+                                <div className="bg-white/90 backdrop-blur-xs p-1 rounded-2xl border border-gray-200/90 shadow-2xs flex items-center gap-1">
+                                    <button
+                                        onClick={() => setAuctionViewTab('franchises')}
+                                        className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                                            auctionViewTab === 'franchises'
+                                                ? 'bg-orange-500 text-white shadow-xs'
+                                                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-grip text-[11px]"></i>
+                                        <span>Franchises ({teamsList.length})</span>
+                                    </button>
+                                    <button
+                                        onClick={() => setAuctionViewTab('leaderboard')}
+                                        className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                                            auctionViewTab === 'leaderboard'
+                                                ? 'bg-amber-500 text-white shadow-xs'
+                                                : 'text-amber-800 hover:text-amber-900 hover:bg-amber-50'
+                                        }`}
+                                    >
+                                        <i className="fa-solid fa-trophy text-[11px] text-amber-500"></i>
+                                        <span>Leaderboard ({players.filter(p => p.team && p.team !== 'UNSOLD').length})</span>
+                                    </button>
+                                </div>
+
                                 <button onClick={() => fetchAllAuctionData(true)} 
                                         className="bg-white/90 hover:bg-white text-gray-700 font-bold px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-xs flex items-center gap-2 shadow-xs transition hover:shadow cursor-pointer">
                                     <i className={`fa-solid fa-rotate text-orange-500 ${isSyncing ? 'fa-spin' : ''}`}></i>
-                                    Refresh Now
+                                    Refresh
                                 </button>
                             </div>
                         </div>
 
-
-
-                        {isPageLoading ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                                {[1,2,3,4,5,6,7,8].map(i => (
-                                    <div key={i} className="bg-white rounded-2xl sm:rounded-[24px] p-5 sm:p-6 border border-gray-100 relative h-[240px] sm:h-[260px]">
-                                        <div className="animate-pulse flex flex-col h-full justify-between">
-                                            <div className="flex items-center gap-4 mt-2">
-                                                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-200 rounded-xl"></div>
-                                                <div className="flex flex-col gap-2">
-                                                    <div className="w-20 h-5 bg-gray-200 rounded"></div>
-                                                    <div className="w-16 h-3 bg-gray-200 rounded"></div>
+                        {/* FRANCHISES TAB VIEW */}
+                        {auctionViewTab === 'franchises' && (
+                            <>
+                                {isPageLoading ? (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                                        {[1,2,3,4,5,6,7,8].map(i => (
+                                            <div key={i} className="bg-white rounded-2xl sm:rounded-[24px] p-5 sm:p-6 border border-gray-100 relative h-[240px] sm:h-[260px]">
+                                                <div className="animate-pulse flex flex-col h-full justify-between">
+                                                    <div className="flex items-center gap-4 mt-2">
+                                                        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-200 rounded-xl"></div>
+                                                        <div className="flex flex-col gap-2">
+                                                            <div className="w-20 h-5 bg-gray-200 rounded"></div>
+                                                            <div className="w-16 h-3 bg-gray-200 rounded"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex justify-between items-end mt-4">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            <div className="w-12 h-3 bg-gray-200 rounded"></div>
+                                                            <div className="w-16 h-5 bg-gray-200 rounded"></div>
+                                                        </div>
+                                                        <div className="flex flex-col gap-1.5 items-end">
+                                                            <div className="w-12 h-3 bg-gray-200 rounded"></div>
+                                                            <div className="w-16 h-5 bg-gray-200 rounded"></div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-4 pt-3 border-t border-gray-50">
+                                                        <div className="w-full h-2.5 bg-gray-200 rounded-full"></div>
+                                                        <div className="w-12 h-2 bg-gray-200 rounded mt-2"></div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex justify-between items-end mt-4">
-                                                <div className="flex flex-col gap-1.5">
-                                                    <div className="w-12 h-3 bg-gray-200 rounded"></div>
-                                                    <div className="w-16 h-5 bg-gray-200 rounded"></div>
-                                                </div>
-                                                <div className="flex flex-col gap-1.5 items-end">
-                                                    <div className="w-12 h-3 bg-gray-200 rounded"></div>
-                                                    <div className="w-16 h-5 bg-gray-200 rounded"></div>
-                                                </div>
-                                            </div>
-                                            <div className="mt-4 pt-3 border-t border-gray-50">
-                                                <div className="w-full h-2.5 bg-gray-200 rounded-full"></div>
-                                                <div className="w-12 h-2 bg-gray-200 rounded mt-2"></div>
-                                            </div>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                                {teamsList.map(teamObj => {
-                                    const team = teamObj.name;
-                                    const totalPurse = Number(teamObj.total_purse || 10000);
-                                    
-                                    // Drafted players strictly matching this team
-                                    const teamDraftedPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(team));
-                                    const totalSpent = teamDraftedPlayers.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
-                                    const purseLeft = Math.max(0, totalPurse - totalSpent);
-                                    const percentUsed = totalPurse > 0 ? Math.min(100, Math.round((totalSpent / totalPurse) * 100)) : 0;
-                                    const logoUrl = teamObj.logo_url || '/logo1.png';
-                                    const themeColor = teamObj.color || 'bg-orange-500';
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                                        {teamsList.map(teamObj => {
+                                            const team = teamObj.name;
+                                            const totalPurse = Number(teamObj.total_purse || 10000);
+                                            
+                                            // Drafted players strictly matching this team
+                                            const teamDraftedPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(team));
+                                            const totalSpent = teamDraftedPlayers.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
+                                            const purseLeft = Math.max(0, totalPurse - totalSpent);
+                                            const percentUsed = totalPurse > 0 ? Math.min(100, Math.round((totalSpent / totalPurse) * 100)) : 0;
+                                            const logoUrl = teamObj.logo_url || '/logo1.png';
+                                            const themeColor = teamObj.color || 'bg-orange-500';
 
-                                    // Retained leaders count
-                                    const retainedLeadersCount = (teamObj.captain_name ? 1 : 0) + (teamObj.vice_captain_name ? 1 : 0);
-                                    const totalSquadCount = teamDraftedPlayers.length + retainedLeadersCount;
-                                    
+                                            // Retained leaders count
+                                            const retainedLeadersCount = (teamObj.captain_name ? 1 : 0) + (teamObj.vice_captain_name ? 1 : 0);
+                                            const totalSquadCount = teamDraftedPlayers.length + retainedLeadersCount;
+                                            
+                                            return (
+                                                <div key={team} onClick={() => handleTeamClick(team)}
+                                                     className="bg-white rounded-2xl sm:rounded-[24px] p-5 sm:p-6 shadow-xs border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group">
+                                                    
+                                                    {/* Faint watermark on the right */}
+                                                    <div className="absolute -bottom-4 -right-4 w-32 h-32 sm:w-40 sm:h-40 opacity-[0.04] group-hover:scale-110 group-hover:opacity-[0.08] transition-all pointer-events-none grayscale">
+                                                        <img src={logoUrl} className="w-full h-full object-contain" alt="" />
+                                                    </div>
+
+                                                    {/* Chevron icon top right */}
+                                                    <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-gray-100 transition-colors shadow-xs">
+                                                        <i className="fa-solid fa-chevron-right text-[10px]"></i>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-3 sm:gap-4 relative z-10 mb-4 sm:mb-6 mt-1 sm:mt-2">
+                                                        <img src={logoUrl} className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-sm group-hover:scale-105 transition-transform" alt={`${team} logo`} />
+                                                        <div className="min-w-0 flex-1">
+                                                            <h3 className="text-lg sm:text-xl font-black text-gray-900 uppercase tracking-tight leading-tight truncate">{team}</h3>
+                                                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                                                                {totalSquadCount} MEMBERS SQUAD
+                                                            </p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex justify-between items-end relative z-10">
+                                                        <div>
+                                                            <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Purse Left</p>
+                                                            <p className="text-lg sm:text-xl font-black text-green-500 leading-none">₹{purseLeft.toLocaleString('en-IN')}</p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Spent</p>
+                                                            <p className="text-lg sm:text-xl font-black text-gray-900 leading-none">₹{totalSpent.toLocaleString('en-IN')}</p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="mt-4 sm:mt-5 relative z-10 pt-3 sm:pt-4 border-t border-gray-50">
+                                                        <div className="w-full h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                                                            <div className={`h-full ${themeColor} rounded-full transition-all duration-500`} style={{ width: `${percentUsed}%` }}></div>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mt-2">
+                                                            <p className="text-[9px] font-bold text-gray-400">{percentUsed}% USED</p>
+                                                            <p className="text-[9px] font-bold text-gray-400">{teamDraftedPlayers.length} Drafted</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {/* LEADERBOARD TAB VIEW */}
+                        {auctionViewTab === 'leaderboard' && (
+                            <div className="flex flex-col gap-6">
+                                {(() => {
+                                    // Filter all drafted regular players
+                                    const allDrafted = players.filter(p => p.team && p.team.trim().toUpperCase() !== 'UNSOLD');
+
+                                    // Filter and sort for leaderboard
+                                    const filteredLeaderboard = allDrafted
+                                        .filter(p => {
+                                            if (!leaderboardSearch) return true;
+                                            const q = leaderboardSearch.toLowerCase().trim();
+                                            return (
+                                                p.name?.toLowerCase().includes(q) ||
+                                                p.phone?.toLowerCase().includes(q) ||
+                                                p.team?.toLowerCase().includes(q) ||
+                                                p.sports?.toLowerCase().includes(q) ||
+                                                p.section?.toLowerCase().includes(q)
+                                            );
+                                        })
+                                        .filter(p => {
+                                            if (leaderboardTeamFilter === 'ALL') return true;
+                                            return getNormalizedTeam(p.team) === getNormalizedTeam(leaderboardTeamFilter);
+                                        })
+                                        .filter(p => {
+                                            if (leaderboardGenderFilter === 'ALL') return true;
+                                            return p.gender === leaderboardGenderFilter;
+                                        })
+                                        .sort((a, b) => {
+                                            if (leaderboardSortBy === 'bid_desc') return Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
+                                            if (leaderboardSortBy === 'bid_asc') return Number(a.bidAmount || 0) - Number(b.bidAmount || 0);
+                                            if (leaderboardSortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+                                            return 0;
+                                        });
+
+                                    const totalSpentAcrossAll = allDrafted.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
+                                    const highestBidAmount = allDrafted.length > 0 ? Math.max(...allDrafted.map(p => Number(p.bidAmount || 0))) : 0;
+                                    const avgBidAmount = allDrafted.length > 0 ? Math.round(totalSpentAcrossAll / allDrafted.length) : 0;
+
                                     return (
-                                        <div key={team} onClick={() => handleTeamClick(team)}
-                                             className="bg-white rounded-2xl sm:rounded-[24px] p-5 sm:p-6 shadow-xs border border-gray-100 hover:shadow-xl transition-all cursor-pointer relative overflow-hidden group">
-                                            
-                                            {/* Faint watermark on the right */}
-                                            <div className="absolute -bottom-4 -right-4 w-32 h-32 sm:w-40 sm:h-40 opacity-[0.04] group-hover:scale-110 group-hover:opacity-[0.08] transition-all pointer-events-none grayscale">
-                                                <img src={logoUrl} className="w-full h-full object-contain" alt="" />
+                                        <>
+                                            {/* SUMMARY STATS BAR */}
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-2xs">
+                                                    <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                                        Total Players Drafted
+                                                    </span>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-2xl sm:text-3xl font-black text-gray-900 leading-none">
+                                                            {allDrafted.length}
+                                                        </span>
+                                                        <span className="text-xs font-bold text-gray-400">players</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-2xs">
+                                                    <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                                        Total Auction Volume
+                                                    </span>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-2xl sm:text-3xl font-black text-orange-600 leading-none">
+                                                            ₹{totalSpentAcrossAll.toLocaleString('en-IN')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-2xs">
+                                                    <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                                        Highest Bid Recorded
+                                                    </span>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-2xl sm:text-3xl font-black text-green-600 leading-none">
+                                                            ₹{highestBidAmount.toLocaleString('en-IN')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100 shadow-2xs">
+                                                    <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                                        Average Bid
+                                                    </span>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-2xl sm:text-3xl font-black text-blue-600 leading-none">
+                                                            ₹{avgBidAmount.toLocaleString('en-IN')}
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             </div>
 
-                                            {/* Chevron icon top right */}
-                                            <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-gray-100 transition-colors shadow-xs">
-                                                <i className="fa-solid fa-chevron-right text-[10px]"></i>
+                                            {/* SEARCH & FILTERS BAR */}
+                                            <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-gray-200/80 shadow-2xs flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+                                                {/* Search Input */}
+                                                <div className="relative flex-1 min-w-[200px]">
+                                                    <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-gray-400 text-xs"></i>
+                                                    <input
+                                                        type="text"
+                                                        value={leaderboardSearch}
+                                                        onChange={(e) => setLeaderboardSearch(e.target.value)}
+                                                        placeholder="Search player name, phone, sports..."
+                                                        className="w-full pl-9 pr-8 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 bg-gray-50/50"
+                                                    />
+                                                    {leaderboardSearch && (
+                                                        <button 
+                                                            onClick={() => setLeaderboardSearch('')}
+                                                            className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                                        >
+                                                            <i className="fa-solid fa-xmark text-xs"></i>
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Franchise Filter */}
+                                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                                    <select
+                                                        value={leaderboardTeamFilter}
+                                                        onChange={(e) => setLeaderboardTeamFilter(e.target.value)}
+                                                        className="px-3 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-xs font-bold bg-white focus:outline-none focus:border-orange-500 cursor-pointer flex-1 sm:flex-initial"
+                                                    >
+                                                        <option value="ALL">All Franchises ({teamsList.length})</option>
+                                                        {teamsList.map(t => (
+                                                            <option key={t.name} value={t.name}>{t.name}</option>
+                                                        ))}
+                                                    </select>
+
+                                                    {/* Gender Filter */}
+                                                    <div className="flex rounded-xl bg-gray-100 p-1 text-xs font-bold shrink-0">
+                                                        <button
+                                                            onClick={() => setLeaderboardGenderFilter('ALL')}
+                                                            className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${leaderboardGenderFilter === 'ALL' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500'}`}
+                                                        >
+                                                            All
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setLeaderboardGenderFilter('M')}
+                                                            className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${leaderboardGenderFilter === 'M' ? 'bg-white text-blue-600 shadow-2xs' : 'text-gray-500'}`}
+                                                        >
+                                                            M
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setLeaderboardGenderFilter('F')}
+                                                            className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${leaderboardGenderFilter === 'F' ? 'bg-white text-pink-600 shadow-2xs' : 'text-gray-500'}`}
+                                                        >
+                                                            F
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Sort Selector */}
+                                                    <select
+                                                        value={leaderboardSortBy}
+                                                        onChange={(e) => setLeaderboardSortBy(e.target.value)}
+                                                        className="px-3 py-2 sm:py-2.5 rounded-xl border border-gray-200 text-xs font-bold bg-white focus:outline-none focus:border-orange-500 cursor-pointer shrink-0"
+                                                    >
+                                                        <option value="bid_desc">Bid: High to Low</option>
+                                                        <option value="bid_asc">Bid: Low to High</option>
+                                                        <option value="name">Name: A-Z</option>
+                                                    </select>
+                                                </div>
                                             </div>
 
-                                            <div className="flex items-center gap-3 sm:gap-4 relative z-10 mb-4 sm:mb-6 mt-1 sm:mt-2">
-                                                <img src={logoUrl} className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-sm group-hover:scale-105 transition-transform" alt={`${team} logo`} />
-                                                <div className="min-w-0 flex-1">
-                                                    <h3 className="text-lg sm:text-xl font-black text-gray-900 uppercase tracking-tight leading-tight truncate">{team}</h3>
-                                                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-1">
-                                                        {totalSquadCount} MEMBERS SQUAD
+                                            {/* LEADERBOARD CARDS & TABLE */}
+                                            {filteredLeaderboard.length === 0 ? (
+                                                <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-xs">
+                                                    <i className="fa-solid fa-trophy text-4xl text-gray-300 mb-3"></i>
+                                                    <h3 className="text-lg font-bold text-gray-700">No Drafted Players Found</h3>
+                                                    <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                                                        {allDrafted.length === 0 
+                                                            ? 'No auction bids have been drafted yet. Once bids are placed on the admin panel, they will appear here in real time.' 
+                                                            : 'No drafted players match your current filter criteria.'}
                                                     </p>
+                                                    {(leaderboardSearch || leaderboardTeamFilter !== 'ALL' || leaderboardGenderFilter !== 'ALL') && (
+                                                        <button
+                                                            onClick={() => {
+                                                                setLeaderboardSearch('');
+                                                                setLeaderboardTeamFilter('ALL');
+                                                                setLeaderboardGenderFilter('ALL');
+                                                            }}
+                                                            className="mt-4 px-4 py-2 bg-orange-50 text-orange-600 text-xs font-bold rounded-xl hover:bg-orange-100 transition cursor-pointer"
+                                                        >
+                                                            Reset Filters
+                                                        </button>
+                                                    )}
                                                 </div>
-                                            </div>
+                                            ) : (
+                                                <>
+                                                    {/* MOBILE LEADERBOARD CARDS (< md) */}
+                                                    <div className="md:hidden flex flex-col gap-3">
+                                                        {filteredLeaderboard.map((player, index) => {
+                                                            const teamObj = teamsList.find(t => getNormalizedTeam(t.name) === getNormalizedTeam(player.team));
+                                                            const rankNum = index + 1;
+                                                            const rankBadgeClass = rankNum === 1
+                                                                ? 'bg-amber-400 text-amber-950 font-black shadow-xs'
+                                                                : rankNum === 2
+                                                                ? 'bg-slate-300 text-slate-800 font-black shadow-xs'
+                                                                : rankNum === 3
+                                                                ? 'bg-amber-700 text-white font-black shadow-xs'
+                                                                : 'bg-gray-100 text-gray-700 font-bold';
 
-                                            <div className="flex justify-between items-end relative z-10">
-                                                <div>
-                                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Purse Left</p>
-                                                    <p className="text-lg sm:text-xl font-black text-green-500 leading-none">₹{purseLeft.toLocaleString('en-IN')}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Spent</p>
-                                                    <p className="text-lg sm:text-xl font-black text-gray-900 leading-none">₹{totalSpent.toLocaleString('en-IN')}</p>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="mt-4 sm:mt-5 relative z-10 pt-3 sm:pt-4 border-t border-gray-50">
-                                                <div className="w-full h-2 sm:h-2.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
-                                                    <div className={`h-full ${themeColor} rounded-full transition-all duration-500`} style={{ width: `${percentUsed}%` }}></div>
-                                                </div>
-                                                <div className="flex justify-between items-center mt-2">
-                                                    <p className="text-[9px] font-bold text-gray-400">{percentUsed}% USED</p>
-                                                    <p className="text-[9px] font-bold text-gray-400">{teamDraftedPlayers.length} Drafted</p>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                            return (
+                                                                <div key={player.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-2xs hover:shadow-md transition flex flex-col gap-3 relative">
+                                                                    <div className="flex items-start justify-between gap-3">
+                                                                        <div className="flex items-center gap-3">
+                                                                            {/* Rank Badge */}
+                                                                            <span className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs shrink-0 ${rankBadgeClass}`}>
+                                                                                #{rankNum}
+                                                                            </span>
+
+                                                                            {/* Avatar */}
+                                                                            <div className="w-11 h-11 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-2xs">
+                                                                                {player.photoUrl ? (
+                                                                                    <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
+                                                                                ) : (
+                                                                                    player.name.charAt(0)
+                                                                                )}
+                                                                            </div>
+
+                                                                            <div className="min-w-0">
+                                                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                    <span className="font-bold text-gray-900 text-sm leading-tight">{player.name}</span>
+                                                                                    <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${player.gender === 'F' ? 'bg-pink-50 text-pink-700' : 'bg-blue-50 text-blue-700'}`}>
+                                                                                        {player.gender}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <p className="text-[11px] text-gray-400 font-medium truncate mt-0.5">
+                                                                                    Yr: <strong>{player.year || 'N/A'}</strong> | Sec: <strong>{player.section || 'N/A'}</strong> | {player.sports || 'All'}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Winning Bid */}
+                                                                        <div className="text-right shrink-0">
+                                                                            <span className="text-base font-black text-orange-600 block leading-tight">
+                                                                                ₹{Number(player.bidAmount || 0).toLocaleString('en-IN')}
+                                                                            </span>
+                                                                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                                                                Winning Bid
+                                                                            </span>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Team & Phone Bar */}
+                                                                    <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2 flex-wrap">
+                                                                        {/* Franchise Badge */}
+                                                                        <div 
+                                                                            onClick={() => handleTeamClick(player.team)}
+                                                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-50 hover:bg-orange-50 border border-gray-200/80 cursor-pointer transition"
+                                                                        >
+                                                                            <img src={teamObj?.logo_url || '/logo1.png'} alt="" className="w-4 h-4 object-contain" />
+                                                                            <span className="text-xs font-bold text-gray-800">{player.team}</span>
+                                                                        </div>
+
+                                                                        {/* Phone Link */}
+                                                                        {player.phone ? (
+                                                                            <div className="flex items-center gap-1.5 ml-auto">
+                                                                                <a
+                                                                                    href={`tel:${player.phone}`}
+                                                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition shadow-2xs"
+                                                                                    title={`Call ${player.name}`}
+                                                                                >
+                                                                                    <i className="fa-solid fa-phone text-emerald-600 text-[10px]"></i>
+                                                                                    <span className="font-mono">{player.phone}</span>
+                                                                                </a>
+                                                                                <button
+                                                                                    onClick={() => {
+                                                                                        navigator.clipboard.writeText(player.phone);
+                                                                                        setCopiedPhone(player.id);
+                                                                                        setTimeout(() => setCopiedPhone(null), 1500);
+                                                                                    }}
+                                                                                    className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center text-[11px] transition cursor-pointer"
+                                                                                    title="Copy Phone Number"
+                                                                                >
+                                                                                    <i className={`fa-solid ${copiedPhone === player.id ? 'fa-check text-green-600' : 'fa-copy'}`}></i>
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <span className="text-[11px] text-gray-400 italic">No phone recorded</span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    {/* DESKTOP LEADERBOARD TABLE (>= md) */}
+                                                    <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-xs overflow-hidden">
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-left text-sm">
+                                                                <thead className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                                                                    <tr>
+                                                                        <th className="px-5 py-4 w-16 text-center">Rank</th>
+                                                                        <th className="px-5 py-4">Player Details</th>
+                                                                        <th className="px-5 py-4">Player Phone / Contact</th>
+                                                                        <th className="px-5 py-4">Drafted Franchise</th>
+                                                                        <th className="px-5 py-4">Batch / Sport</th>
+                                                                        <th className="px-5 py-4 text-right">Winning Bid</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-gray-100">
+                                                                    {filteredLeaderboard.map((player, index) => {
+                                                                        const teamObj = teamsList.find(t => getNormalizedTeam(t.name) === getNormalizedTeam(player.team));
+                                                                        const rankNum = index + 1;
+                                                                        const rankBadgeClass = rankNum === 1
+                                                                            ? 'bg-amber-400 text-amber-950 font-black shadow-xs'
+                                                                            : rankNum === 2
+                                                                            ? 'bg-slate-300 text-slate-800 font-black shadow-xs'
+                                                                            : rankNum === 3
+                                                                            ? 'bg-amber-700 text-white font-black shadow-xs'
+                                                                            : 'bg-gray-100 text-gray-600 font-bold';
+
+                                                                        return (
+                                                                            <tr key={player.id} className="hover:bg-orange-50/30 transition">
+                                                                                <td className="px-5 py-4 text-center">
+                                                                                    <span className={`inline-flex w-7 h-7 rounded-xl items-center justify-center text-xs ${rankBadgeClass}`}>
+                                                                                        #{rankNum}
+                                                                                    </span>
+                                                                                </td>
+
+                                                                                <td className="px-5 py-4">
+                                                                                    <div className="flex items-center gap-3">
+                                                                                        <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-2xs">
+                                                                                            {player.photoUrl ? (
+                                                                                                <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
+                                                                                            ) : (
+                                                                                                player.name.charAt(0)
+                                                                                            )}
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            <div className="flex items-center gap-2">
+                                                                                                <span className="font-bold text-gray-900">{player.name}</span>
+                                                                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${player.gender === 'F' ? 'bg-pink-50 text-pink-700' : 'bg-blue-50 text-blue-700'}`}>
+                                                                                                    {player.gender}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                            <span className="text-xs text-gray-400">{player.role || 'Player'}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+
+                                                                                <td className="px-5 py-4">
+                                                                                    {player.phone ? (
+                                                                                        <div className="inline-flex items-center gap-2">
+                                                                                            <a
+                                                                                                href={`tel:${player.phone}`}
+                                                                                                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl transition shadow-2xs"
+                                                                                                title={`Call ${player.name}`}
+                                                                                            >
+                                                                                                <i className="fa-solid fa-phone text-emerald-600 text-xs"></i>
+                                                                                                <span className="font-mono">{player.phone}</span>
+                                                                                            </a>
+                                                                                            <button
+                                                                                                onClick={() => {
+                                                                                                    navigator.clipboard.writeText(player.phone);
+                                                                                                    setCopiedPhone(player.id);
+                                                                                                    setTimeout(() => setCopiedPhone(null), 1500);
+                                                                                                }}
+                                                                                                className="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center text-xs transition cursor-pointer"
+                                                                                                title="Copy Phone Number"
+                                                                                            >
+                                                                                                <i className={`fa-solid ${copiedPhone === player.id ? 'fa-check text-green-600' : 'fa-copy'}`}></i>
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <span className="text-xs text-gray-400 italic">No phone recorded</span>
+                                                                                    )}
+                                                                                </td>
+
+                                                                                <td className="px-5 py-4">
+                                                                                    <button
+                                                                                        onClick={() => handleTeamClick(player.team)}
+                                                                                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-50 hover:bg-orange-50 border border-gray-200/80 cursor-pointer transition"
+                                                                                    >
+                                                                                        <img src={teamObj?.logo_url || '/logo1.png'} alt="" className="w-5 h-5 object-contain" />
+                                                                                        <span className="text-xs font-bold text-gray-900">{player.team}</span>
+                                                                                    </button>
+                                                                                </td>
+
+                                                                                <td className="px-5 py-4">
+                                                                                    <div className="text-xs text-gray-700">
+                                                                                        Yr: <strong>{player.year || 'N/A'}</strong> | Sec: <strong>{player.section || 'N/A'}</strong>
+                                                                                    </div>
+                                                                                    <div className="text-xs text-gray-400 font-medium truncate max-w-[150px]">
+                                                                                        {player.sports || 'All'}
+                                                                                    </div>
+                                                                                </td>
+
+                                                                                <td className="px-5 py-4 text-right">
+                                                                                    <span className="text-base font-black text-orange-600 block">
+                                                                                        ₹{Number(player.bidAmount || 0).toLocaleString('en-IN')}
+                                                                                    </span>
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
+                                        </>
                                     );
-                                })}
+                                })()}
                             </div>
                         )}
                     </div>
@@ -626,12 +1115,16 @@ function Auction() {
                                         vice_captain_gender: 'F'
                                     };
 
+                                    const captainPlayer = players.find(p => p.name && p.name.trim().toLowerCase() === (currentTeamData.captain_name || '').trim().toLowerCase());
+                                    const viceCaptainPlayer = players.find(p => p.name && p.name.trim().toLowerCase() === (currentTeamData.vice_captain_name || '').trim().toLowerCase());
+
                                     const captainData = {
                                         name: currentTeamData.captain_name || 'Captain',
                                         gender: currentTeamData.captain_gender || 'M',
                                         initials: currentTeamData.captain_initials || (currentTeamData.captain_name ? currentTeamData.captain_name.slice(0, 2).toUpperCase() : 'CP'),
                                         color: currentTeamData.captain_color || '#D6CFCB',
-                                        photo: currentTeamData.captain_photo || ''
+                                        photo: currentTeamData.captain_photo || captainPlayer?.photoUrl || '',
+                                        phone: currentTeamData.captain_phone || captainPlayer?.phone || ''
                                     };
 
                                     const viceCaptainData = {
@@ -639,7 +1132,8 @@ function Auction() {
                                         gender: currentTeamData.vice_captain_gender || 'F',
                                         initials: currentTeamData.vice_captain_initials || (currentTeamData.vice_captain_name ? currentTeamData.vice_captain_name.slice(0, 2).toUpperCase() : 'VC'),
                                         color: currentTeamData.vice_captain_color || '#2196F3',
-                                        photo: currentTeamData.vice_captain_photo || ''
+                                        photo: currentTeamData.vice_captain_photo || viceCaptainPlayer?.photoUrl || '',
+                                        phone: currentTeamData.vice_captain_phone || viceCaptainPlayer?.phone || ''
                                     };
 
                                     const regulars = teamDraftedPlayers;
@@ -732,6 +1226,17 @@ function Auction() {
                                                                             <span className="text-[10px] font-bold bg-white text-gray-600 border border-gray-200 px-2 py-0.5 rounded-md">
                                                                                 {player.gender}
                                                                             </span>
+                                                                            {player.phone ? (
+                                                                                <a
+                                                                                    href={`tel:${player.phone}`}
+                                                                                    onClick={(e) => e.stopPropagation()}
+                                                                                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-700 bg-white hover:bg-orange-50 hover:text-orange-600 border border-gray-200 hover:border-orange-300 px-2.5 py-0.5 rounded-md transition shadow-2xs"
+                                                                                    title={`Call ${player.name}: ${player.phone}`}
+                                                                                >
+                                                                                    <i className="fa-solid fa-phone text-orange-500 text-[10px]"></i>
+                                                                                    <span>{player.phone}</span>
+                                                                                </a>
+                                                                            ) : null}
                                                                         </div>
                                                                         <p className="text-[11px] sm:text-xs text-gray-500 mt-1 truncate">
                                                                             Yr: <strong>{player.year || 'N/A'}</strong> | Sec: <strong>{player.section || 'N/A'}</strong> | <strong>{player.sports || 'Sports'}</strong>
