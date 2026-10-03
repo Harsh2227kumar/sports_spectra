@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ADMIN_IMPORT } from '../utils/paths';
 import { formatPhotoUrl } from '../utils/photoUtils';
+import PlayerAvatar from '../components/PlayerAvatar';
 import { 
   supabase, 
   getLocalPlayersRegistry, 
@@ -742,13 +743,11 @@ function Admin() {
                                                     className="p-3.5 hover:bg-orange-50 cursor-pointer flex items-center justify-between border-b border-gray-50 last:border-0 transition"
                                                 >
                                                     <div className="flex items-center gap-3">
-                                                        <div className="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-                                                            {player.photoUrl ? (
-                                                                <img src={player.photoUrl} alt="" className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                player.name.slice(0, 2).toUpperCase()
-                                                            )}
-                                                        </div>
+                                                        <PlayerAvatar
+                                                            photoUrl={player.photoUrl}
+                                                            name={player.name}
+                                                            containerClassName="w-9 h-9 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden shadow-2xs"
+                                                        />
                                                         <div>
                                                             <div className="font-bold text-gray-900 text-sm">{player.name}</div>
                                                             <div className="text-[11px] text-gray-500 flex items-center gap-1.5 flex-wrap">
@@ -774,13 +773,11 @@ function Admin() {
                                 {selectedPlayerObj && (
                                     <div className="bg-orange-50/70 border border-orange-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-12 h-12 rounded-xl bg-white text-orange-600 border border-orange-200 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden">
-                                                {selectedPlayerObj.photoUrl ? (
-                                                    <img src={selectedPlayerObj.photoUrl} alt="" className="w-full h-full object-cover" />
-                                                ) : (
-                                                    selectedPlayerObj.name.slice(0, 2).toUpperCase()
-                                                )}
-                                            </div>
+                                            <PlayerAvatar
+                                                photoUrl={selectedPlayerObj.photoUrl}
+                                                name={selectedPlayerObj.name}
+                                                containerClassName="w-12 h-12 rounded-xl bg-white text-orange-600 border border-orange-200 flex items-center justify-center font-black text-sm shrink-0 overflow-hidden shadow-2xs"
+                                            />
                                             <div>
                                                 <div className="font-black text-gray-900 text-sm flex items-center gap-2 flex-wrap">
                                                     <span>{selectedPlayerObj.name}</span>
@@ -1190,7 +1187,13 @@ function Admin() {
                                 <i className="fa-solid fa-xmark"></i>
                             </button>
                         </div>
-                        {selectedBidPlayer?.photo_url && <img src={selectedBidPlayer.photo_url} alt={selectedBidDetails.playerName} className="w-20 h-20 rounded-2xl object-cover mb-5" />}
+                        {(selectedBidPlayer?.photo_url || selectedBidPlayer?.photoUrl) && (
+                            <PlayerAvatar
+                                photoUrl={selectedBidPlayer.photo_url || selectedBidPlayer.photoUrl}
+                                name={selectedBidDetails.playerName}
+                                containerClassName="w-20 h-20 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-lg shrink-0 overflow-hidden shadow-xs mb-5"
+                            />
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
                                 ['Gender', selectedBidPlayer?.gender],
