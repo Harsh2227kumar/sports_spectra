@@ -15,7 +15,9 @@ import {
   logActivityToSupabase,
   fetchActivityLogsFromSupabase,
   clearActivityLogsInSupabase,
-  getLocalActivityLogs
+  getLocalActivityLogs,
+  getLocalTeamPenalties,
+  saveLocalTeamPenalties
 } from '../supabaseClient';
 
 function Admin() {
@@ -71,6 +73,12 @@ function Admin() {
     const [successMsg, setSuccessMsg] = useState('');
     const [errorMessage, setErrorMessage] = useState(null);
     const [isSavingBid, setIsSavingBid] = useState(false);
+
+    // Penalty State
+    const [teamPenalties, setTeamPenalties] = useState(() => getLocalTeamPenalties());
+    const [penaltyForm, setPenaltyForm] = useState({ team: getLocalTeams()[0]?.name || 'Team 1', amount: '' });
+    const [isSavingPenalty, setIsSavingPenalty] = useState(false);
+
 
     // Autocomplete state
     const [suggestions, setSuggestions] = useState([]);
@@ -549,15 +557,63 @@ function Admin() {
         const team = teamObj.name;
         const totalPurse = Number(teamObj.total_purse || 10000);
         const bids = teamBids.filter(b => (b.team || '').toLowerCase().replace(/\s+/g, '') === team.toLowerCase().replace(/\s+/g, ''));
-        const spent = bids.reduce((acc, b) => acc + Number(b.bidAmount || 0), 0);
+        const spentOnPlayers = bids.reduce((acc, b) => acc + Number(b.bidAmount || 0), 0);
+        
+        // Add penalties
+        const teamPenaltyRecs = teamPenalties.filter(p => (p.team || '').toLowerCase().replace(/\s+/g, '') === team.toLowerCase().replace(/\s+/g, ''));
+        const penaltyAmount = teamPenaltyRecs.reduce((acc, p) => acc + Number(p.amount || 0), 0);
+        
+        const totalSpentAndPenalized = spentOnPlayers + penaltyAmount;
+
         return {
             name: team,
             totalPurse,
-            spent,
-            purseLeft: Math.max(0, totalPurse - spent),
+            spent: spentOnPlayers,
+            penaltyAmount,
+            totalSpentAndPenalized,
+            purseLeft: Math.max(0, totalPurse - totalSpentAndPenalized),
             playerCount: bids.length
         };
     });
+
+    const handlePenaltySubmit = (e) => {
+        e.preventDefault();
+        const amt = Number(penaltyForm.amount);
+        if (isNaN(amt) || amt <= 0) {
+            setErrorMessage('Penalty amount must be greater than 0.');
+            return;
+        }
+        
+        setIsSavingPenalty(true);
+        const newPenalty = {
+            id: 'pen-' + Date.now(),
+            team: penaltyForm.team,
+            amount: amt,
+            timestamp: new Date().toISOString()
+        };
+        
+        const updatedPenalties = [newPenalty, ...teamPenalties];
+        setTeamPenalties(updatedPenalties);
+        saveLocalTeamPenalties(updatedPenalties);
+        
+        setSuccessMsg(`Penalty of ₹${amt} marked for ${penaltyForm.team}`);
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 4000);
+        addLogEntry('PENALTY', `Deducted ₹${amt} from ${penaltyForm.team} as misconduct penalty`);
+        
+        setPenaltyForm({ ...penaltyForm, amount: '' });
+        setIsSavingPenalty(false);
+        window.dispatchEvent(new Event('storage'));
+    };
+
+    const handleRemovePenalty = (id) => {
+        const updatedPenalties = teamPenalties.filter(p => p.id !== id);
+        setTeamPenalties(updatedPenalties);
+        saveLocalTeamPenalties(updatedPenalties);
+        addLogEntry('PENALTY_REMOVED', `Removed a penalty`);
+        window.dispatchEvent(new Event('storage'));
+    };
+
 
     const selectedBidPlayer = selectedBidDetails
         ? masterPlayers.find(p => (selectedBidDetails.playerId && String(p.id) === String(selectedBidDetails.playerId)) || p.name?.trim().toLowerCase() === selectedBidDetails.playerName?.trim().toLowerCase())
@@ -908,6 +964,74 @@ function Admin() {
                                     ₹{teamBids.reduce((sum, b) => sum + Number(b.bidAmount || 0), 0).toLocaleString('en-IN')}
                                 </span>
                             </div>
+                        </div>
+
+                        {/* PENALTY SYSTEM */}
+                        <div className="bg-white rounded-3xl p-8 border border-red-200 shadow-sm">
+                            <h3 className="text-xl font-black text-red-600 tracking-tight mb-4"><i className="fa-solid fa-gavel"></i> Penalty System</h3>
+                            <form onSubmit={handlePenaltySubmit} className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            Select Franchise <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={penaltyForm.team}
+                                            onChange={(e) => setPenaltyForm({ ...penaltyForm, team: e.target.value })}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-red-500 font-semibold text-sm bg-white cursor-pointer"
+                                            required
+                                        >
+                                            {teamsList.map(t => (
+                                                <option key={t.name} value={t.name}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            Penalty Amount (₹) <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-gray-400 font-bold">₹</span>
+                                            <input
+                                                type="number"
+                                                value={penaltyForm.amount}
+                                                onChange={(e) => setPenaltyForm({ ...penaltyForm, amount: e.target.value })}
+                                                placeholder="Amount"
+                                                min="1"
+                                                className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-red-500 font-black text-sm"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isSavingPenalty}
+                                    className="w-full py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-black text-sm rounded-xl shadow-lg shadow-red-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    <i className={`fa-solid ${isSavingPenalty ? 'fa-spinner fa-spin' : 'fa-minus-circle'}`}></i>
+                                    {isSavingPenalty ? 'Saving...' : 'Deduct Penalty'}
+                                </button>
+                            </form>
+
+                            {teamPenalties.length > 0 && (
+                                <div className="mt-6">
+                                    <h4 className="text-sm font-bold text-gray-900 mb-2">Active Penalties</h4>
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                                        {teamPenalties.map(p => (
+                                            <div key={p.id} className="flex justify-between items-center bg-red-50/50 border border-red-100 p-2 rounded-lg">
+                                                <div className="text-xs">
+                                                    <span className="font-bold text-gray-800">{p.team}</span>
+                                                    <span className="text-red-600 font-black ml-2">-₹{p.amount}</span>
+                                                </div>
+                                                <button onClick={() => handleRemovePenalty(p.id)} className="text-red-400 hover:text-red-600 cursor-pointer">
+                                                    <i className="fa-solid fa-times"></i>
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

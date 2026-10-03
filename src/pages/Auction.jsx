@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   supabase, 
   saveLocalTeams, 
-  getSupabaseConfig
+  getSupabaseConfig,
+  getLocalTeamPenalties
 } from '../supabaseClient';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -29,6 +30,12 @@ function Auction() {
     const [leaderboardGenderFilter, setLeaderboardGenderFilter] = useState('ALL');
     const [leaderboardSortBy, setLeaderboardSortBy] = useState('bid_desc');
     const [copiedPhone, setCopiedPhone] = useState(null);
+    
+    // Squad Filters
+    const [squadSearch, setSquadSearch] = useState('');
+    const [squadGenderFilter, setSquadGenderFilter] = useState('ALL');
+    const [squadSortBy, setSquadSortBy] = useState('bid_desc');
+    
     const auctionFetchInFlight = useRef(false);
     const auctionRefreshQueued = useRef(false);
 
@@ -1172,15 +1179,43 @@ function Auction() {
                                         phone: currentTeamData.vice_captain_phone || viceCaptainPlayer?.phone || ''
                                     };
 
-                                    const regulars = teamDraftedPlayers;
+                                    let regulars = teamDraftedPlayers;
+                                    
+                                    // Apply sorting and filtering to regulars
+                                    regulars = regulars.filter(p => {
+                                        if (!squadSearch) return true;
+                                        const q = squadSearch.toLowerCase().trim();
+                                        return (
+                                            p.name?.toLowerCase().includes(q) ||
+                                            p.sports?.toLowerCase().includes(q)
+                                        );
+                                    }).filter(p => {
+                                        if (squadGenderFilter === 'ALL') return true;
+                                        return p.gender === squadGenderFilter;
+                                    }).sort((a, b) => {
+                                        if (squadSortBy === 'bid_desc') return Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
+                                        if (squadSortBy === 'bid_asc') return Number(a.bidAmount || 0) - Number(b.bidAmount || 0);
+                                        if (squadSortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+                                        return 0;
+                                    });
+
                                     const totalGirls = (captainData.gender === 'F' && currentTeamData.captain_name ? 1 : 0) + 
+
                                                        (viceCaptainData.gender === 'F' && currentTeamData.vice_captain_name ? 1 : 0) + 
                                                        regulars.filter(p => p.gender === 'F').length;
                                     const girlsRemaining = Math.max(0, 11 - totalGirls);
-                                    const totalSpent = regulars.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
+                                    const totalSpentOnPlayers = regulars.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
+                                    
+                                    // Add Penalties
+                                    const allPenalties = getLocalTeamPenalties();
+                                    const teamPenalties = allPenalties.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(activeTeam));
+                                    const totalPenalty = teamPenalties.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                                    
+                                    const totalSpent = totalSpentOnPlayers + totalPenalty;
                                     const totalPurse = Number(currentTeamData.total_purse || 10000);
                                     const purseLeft = Math.max(0, totalPurse - totalSpent);
                                     const retainedCount = (currentTeamData.captain_name ? 1 : 0) + (currentTeamData.vice_captain_name ? 1 : 0);
+
 
                                     return (
                                         <>
@@ -1225,38 +1260,79 @@ function Auction() {
                                                 </div>
                                             )}
 
-                                            {/* DRAFTED PLAYERS SQUAD */}
                                             <div className="bg-white rounded-2xl sm:rounded-[32px] p-4 sm:p-6 md:p-8 shadow-xs border border-gray-100 mb-8 sm:mb-12">
-                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 sm:gap-2 mb-4 sm:mb-6">
+                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
                                                     <div>
                                                         <h3 className="text-xl sm:text-2xl font-black text-gray-900">Drafted Squad</h3>
                                                         <p className="text-[11px] sm:text-xs text-gray-400 uppercase tracking-wider font-bold mt-0.5">
-                                                            {regulars.length} Regular Players Drafted
+                                                            {teamDraftedPlayers.length} Regular Players Drafted
                                                         </p>
                                                     </div>
-                                                    <div className="text-xs font-bold text-gray-500 bg-gray-50 px-3 py-1 rounded-full border border-gray-100">
-                                                        {activeTeam}
+                                                </div>
+                                                
+                                                {/* Squad Filters */}
+                                                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                                    <div className="relative flex-1">
+                                                        <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
+                                                        <input
+                                                            type="text"
+                                                            value={squadSearch}
+                                                            onChange={(e) => setSquadSearch(e.target.value)}
+                                                            placeholder="Search players, sports..."
+                                                            className="w-full pl-8 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-orange-500 text-xs font-semibold"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                                                        <div className="flex rounded-lg bg-gray-200/50 p-1 text-xs font-bold shrink-0">
+                                                            <button
+                                                                onClick={() => setSquadGenderFilter('ALL')}
+                                                                className={`px-2 py-1 rounded transition cursor-pointer ${squadGenderFilter === 'ALL' ? 'bg-white text-gray-900 shadow-2xs' : 'text-gray-500'}`}
+                                                            >
+                                                                All
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setSquadGenderFilter('M')}
+                                                                className={`px-2 py-1 rounded transition cursor-pointer ${squadGenderFilter === 'M' ? 'bg-white text-blue-600 shadow-2xs' : 'text-gray-500'}`}
+                                                            >
+                                                                M
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setSquadGenderFilter('F')}
+                                                                className={`px-2 py-1 rounded transition cursor-pointer ${squadGenderFilter === 'F' ? 'bg-white text-pink-600 shadow-2xs' : 'text-gray-500'}`}
+                                                            >
+                                                                F
+                                                            </button>
+                                                        </div>
+                                                        <select
+                                                            value={squadSortBy}
+                                                            onChange={(e) => setSquadSortBy(e.target.value)}
+                                                            className="px-2 py-2 rounded-lg border border-gray-200 text-xs font-bold bg-white focus:outline-none focus:border-orange-500 cursor-pointer shrink-0"
+                                                        >
+                                                            <option value="bid_desc">Highest Bid</option>
+                                                            <option value="bid_asc">Lowest Bid</option>
+                                                            <option value="name">Name (A-Z)</option>
+                                                        </select>
                                                     </div>
                                                 </div>
 
                                                 {regulars.length === 0 ? (
                                                     <div className="text-center py-12 sm:py-16 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
                                                         <i className="fa-solid fa-users text-3xl sm:text-4xl text-gray-300 mb-3"></i>
-                                                        <p className="text-gray-500 font-bold text-sm">No regular players drafted yet for {activeTeam}.</p>
+                                                        <p className="text-gray-500 font-bold text-sm">No regular players matching filters drafted yet for {activeTeam}.</p>
                                                     </div>
                                                 ) : (
-                                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+                                                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
                                                         {regulars.map(player => (
                                                             <div key={player.id} className="bg-gray-50/60 hover:bg-orange-50/50 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-gray-100 transition group">
                                                                 <div className="flex items-center gap-3 sm:gap-4">
                                                                     <PlayerAvatar
                                                                         photoUrl={player.photoUrl}
                                                                         name={player.name}
-                                                                        containerClassName="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm sm:text-base shrink-0 overflow-hidden shadow-xs"
+                                                                        containerClassName="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center font-black text-sm sm:text-lg shrink-0 overflow-hidden shadow-xs"
                                                                     />
                                                                     <div className="min-w-0">
-                                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                                            <span className="font-bold text-gray-900 text-sm sm:text-base">{player.name}</span>
+                                                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                                            <span className="font-bold text-gray-900 text-sm sm:text-lg">{player.name}</span>
                                                                             <span className="text-[10px] font-bold bg-white text-gray-600 border border-gray-200 px-2 py-0.5 rounded-md">
                                                                                 {player.gender}
                                                                             </span>
@@ -1272,13 +1348,16 @@ function Auction() {
                                                                                 </a>
                                                                             ) : null}
                                                                         </div>
-                                                                        <p className="text-[11px] sm:text-xs text-gray-500 mt-1 truncate">
-                                                                            Yr: <strong>{player.year || 'N/A'}</strong> | Sec: <strong>{player.section || 'N/A'}</strong> | <strong>{player.sports || 'Sports'}</strong>
+                                                                        <p className="text-[11px] sm:text-xs text-gray-500 truncate">
+                                                                            Yr: <strong>{player.year || 'N/A'}</strong> | Sec: <strong>{player.section || 'N/A'}</strong>
+                                                                        </p>
+                                                                        <p className="text-[11px] sm:text-xs text-gray-600 font-semibold truncate mt-0.5 bg-gray-100/80 inline-block px-2 py-0.5 rounded">
+                                                                            Sports: <span className="text-gray-900">{player.sports || 'All'}</span>
                                                                         </p>
                                                                     </div>
                                                                 </div>
                                                                 <div className="sm:text-right flex sm:flex-col justify-between items-baseline sm:items-end border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100">
-                                                                    <span className="text-base sm:text-lg font-black text-orange-600">
+                                                                    <span className="text-base sm:text-xl font-black text-orange-600">
                                                                         ₹{Number(player.bidAmount || 0).toLocaleString('en-IN')}
                                                                     </span>
                                                                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Winning Bid</p>

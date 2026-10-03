@@ -274,6 +274,27 @@ export function saveLocalTeamBids(bids) {
   }
 }
 
+export function getLocalTeamPenalties() {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('team_penalties');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalTeamPenalties(penalties) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('team_penalties', JSON.stringify(penalties));
+    window.dispatchEvent(new Event('storage'));
+  } catch (err) {
+    console.warn('[Sports Spectra] Local penalties save failed:', err);
+  }
+}
+
+
 export function getLocalTeams() {
   if (typeof window === 'undefined') return DEFAULT_TEAMS_DATA;
   try {
