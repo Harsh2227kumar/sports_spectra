@@ -307,7 +307,7 @@ export default function DataImportExport() {
           duplicateInFileCount,
           existingInDbCount,
           errorCount,
-          canImport: validCount > 0 || (existingInDbCount > 0 && updateExistingOption)
+          canImport: validCount > 0 || existingInDbCount > 0
         });
       },
       error: (err) => {
@@ -318,14 +318,27 @@ export default function DataImportExport() {
 
   const handleConfirmImport = async () => {
     setIsImporting(true);
-    setShowImportConfirmModal(false);
 
     try {
+      // Recheck the database at commit time so stale previews cannot create duplicates.
+      const { data: currentPlayers, error: fetchError } = await supabase
+        .from('players')
+        .select('id, name');
+      if (fetchError) throw fetchError;
+
+      const playersByName = new Map(
+        (currentPlayers || []).map(player => [String(player.name || '').trim().toLocaleLowerCase(), player])
+      );
       const rowsToInsert = [];
       const rowsToUpdate = [];
 
       parsedRows.forEach(row => {
-        if (row.status === 'valid') {
+        if (row.status === 'error' || row.status === 'duplicate_file') return;
+
+        const existingPlayer = playersByName.get(row.name.trim().toLocaleLowerCase());
+        if (existingPlayer) {
+          if (updateExistingOption) rowsToUpdate.push({ id: existingPlayer.id, row });
+        } else {
           rowsToInsert.push({
             name: row.name,
             gender: row.gender,
@@ -337,16 +350,6 @@ export default function DataImportExport() {
             team: 'UNSOLD',
             role: 'Player',
             bid_amount: 0
-          });
-        } else if (row.status === 'existing_db' && updateExistingOption) {
-          rowsToUpdate.push({
-            name: row.name,
-            gender: row.gender,
-            year: row.year,
-            section: row.section,
-            sports: row.sports,
-            phone_no: row.phone || '',
-            photo_url: row.photo_url
           });
         }
       });
@@ -361,18 +364,20 @@ export default function DataImportExport() {
       }
 
       if (rowsToUpdate.length > 0) {
-        for (const r of rowsToUpdate) {
-          const updatePayload = {
-            gender: r.gender,
-            year: r.year,
-            section: r.section,
-            sports: r.sports,
-            photo_url: r.photo_url
-          };
-          if (r.phone_no) {
-            updatePayload.phone_no = r.phone_no;
-          }
-          await supabase.from('players').update(updatePayload).eq('name', r.name);
+        for (const { id, row } of rowsToUpdate) {
+          const { error: updateError } = await supabase
+            .from('players')
+            .update({
+              name: row.name,
+              gender: row.gender,
+              year: row.year,
+              section: row.section,
+              sports: row.sports,
+              phone_no: row.phone || '',
+              photo_url: row.photo_url || ''
+            })
+            .eq('id', id);
+          if (updateError) throw updateError;
           updatedCount++;
         }
       }
@@ -398,7 +403,9 @@ export default function DataImportExport() {
       setParsedRows([]);
       setValidationReport(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
+      setShowImportConfirmModal(false);
     } catch (err) {
+      setShowImportConfirmModal(false);
       setImportNotification({
         type: 'error',
         message: `Import failed: ${err.message || 'Unknown database error'}`
@@ -885,7 +892,7 @@ export default function DataImportExport() {
                       </button>
                       <button
                         onClick={() => setShowImportConfirmModal(true)}
-                        disabled={!validationReport.canImport || isImporting}
+                        disabled={!(validationReport.validCount > 0 || (updateExistingOption && validationReport.existingInDbCount > 0)) || isImporting}
                         className="px-6 py-2.5 text-xs font-bold bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-xl transition shadow-md shadow-orange-200 flex items-center gap-2 cursor-pointer"
                       >
                         <i className="fa-solid fa-cloud-arrow-up"></i>
@@ -1305,9 +1312,10 @@ export default function DataImportExport() {
               </button>
               <button
                 onClick={handleConfirmImport}
-                className="flex-1 py-3 text-xs font-bold bg-orange-500 hover:bg-orange-600 text-white rounded-xl transition shadow-lg shadow-orange-200 cursor-pointer"
+                disabled={isImporting}
+                className="flex-1 py-3 text-xs font-bold bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-xl transition shadow-lg shadow-orange-200 cursor-pointer"
               >
-                Proceed with Import
+                {isImporting ? 'Importing...' : 'Proceed with Import'}
               </button>
             </div>
           </div>
