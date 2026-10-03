@@ -58,7 +58,8 @@ function Admin() {
             playerName: b.player_name,
             team: b.team,
             role: b.role || 'Player',
-            bidAmount: Number(b.bid_amount || 0)
+            bidAmount: Number(b.bid_amount || 0),
+            createdAt: b.created_at || ''
         }));
     });
 
@@ -67,6 +68,7 @@ function Admin() {
     const [showSuccess, setShowSuccess] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
     const [errorMessage, setErrorMessage] = useState(null);
+    const [isSavingBid, setIsSavingBid] = useState(false);
 
     // Autocomplete state
     const [suggestions, setSuggestions] = useState([]);
@@ -89,6 +91,9 @@ function Admin() {
     // Delete confirm modal state
     const [deleteConfirmBid, setDeleteConfirmBid] = useState(null);
     const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [selectedBidDetails, setSelectedBidDetails] = useState(null);
+    const adminFetchInFlight = useRef(false);
+    const adminRefreshQueued = useRef(false);
 
     // Supabase Connection state
     const [dbStatus, setDbStatus] = useState({ connected: false, latency: 0, message: '' });
@@ -149,6 +154,11 @@ function Admin() {
 
     // Fetch master players and team bids directly from database
     const loadData = async () => {
+        if (adminFetchInFlight.current) {
+            adminRefreshQueued.current = true;
+            return;
+        }
+        adminFetchInFlight.current = true;
         const startTime = performance.now();
         try {
             // 1. Fetch Master Players, Team Bids, Teams, and Activity Logs
@@ -188,6 +198,7 @@ function Admin() {
 
             if (!playersRes.error && playersRes.data) {
                 const mappedPlayers = playersRes.data.map(p => ({
+                    ...p,
                     id: p.id,
                     name: p.name,
                     gender: p.gender || 'M',
@@ -208,7 +219,8 @@ function Admin() {
                     playerName: b.player_name,
                     team: b.team,
                     role: b.role || 'Player',
-                    bidAmount: Number(b.bid_amount || 0)
+                    bidAmount: Number(b.bid_amount || 0),
+                    createdAt: b.created_at || ''
                 }));
                 setTeamBids(mappedBids);
             }
@@ -233,6 +245,12 @@ function Admin() {
             }
         } catch (err) {
             console.warn('[Sports Spectra] Error loading admin database data:', err);
+        } finally {
+            adminFetchInFlight.current = false;
+            if (adminRefreshQueued.current) {
+                adminRefreshQueued.current = false;
+                queueMicrotask(() => loadData());
+            }
         }
     };
 
@@ -245,10 +263,16 @@ function Admin() {
         };
         syncFromDb();
 
-        // High frequency poll for instant live updates
-        const poll = setInterval(() => {
-            if (isAuthenticated) loadData();
-        }, 2500);
+        // Realtime is primary; keep a quick polling fallback only while its channel is down.
+        let poll = null;
+        const startFallbackPolling = () => {
+            if (!poll) poll = setInterval(() => { if (isAuthenticated) loadData(); }, 1000);
+        };
+        const stopFallbackPolling = () => {
+            if (poll) clearInterval(poll);
+            poll = null;
+        };
+        startFallbackPolling();
 
         const handleCredsChanged = () => {
             const fresh = getSupabaseConfig();
@@ -265,12 +289,15 @@ function Admin() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'team_bids' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => loadData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => loadData())
-            .subscribe();
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') stopFallbackPolling();
+                else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) startFallbackPolling();
+            });
 
         window.addEventListener('storage', loadData);
         return () => {
             isCancelled = true;
-            clearInterval(poll);
+            stopFallbackPolling();
             window.removeEventListener('storage', loadData);
             window.removeEventListener('supabase-credentials-changed', handleCredsChanged);
             try { supabase.removeChannel(sub); } catch {}
@@ -363,9 +390,10 @@ function Admin() {
         setFormData(prev => ({ ...prev, [id]: value }));
     };
 
-    // Save bid to database (team_bids and players table)
+    // team_bids is the canonical source for drafted status and bid amounts.
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (isSavingBid) return;
         
         const playerNameTrimmed = formData.playerName.trim();
         if (!playerNameTrimmed) return;
@@ -383,45 +411,47 @@ function Admin() {
         const playerObj = selectedPlayerObj || masterPlayers.find(p => p.name.toLowerCase() === playerNameTrimmed.toLowerCase());
         const playerId = playerObj ? playerObj.id : null;
 
+        setIsSavingBid(true);
+        setErrorMessage(null);
         try {
+            const bidFields = {
+                team: formData.team,
+                role: formData.role,
+                bid_amount: bidAmountNum,
+                player_name: playerNameTrimmed,
+                player_id: playerId
+            };
             if (targetBidId) {
-                // Update existing bid in team_bids
-                await supabase.from('team_bids').update({
+                const { error } = await supabase.from('team_bids').update(bidFields).eq('id', targetBidId);
+                if (error) throw error;
+                setTeamBids(prev => prev.map(b => b.id === targetBidId ? {
+                    ...b,
+                    playerId,
+                    playerName: playerNameTrimmed,
                     team: formData.team,
                     role: formData.role,
-                    bid_amount: bidAmountNum,
-                    player_name: playerNameTrimmed,
-                    player_id: playerId
-                }).eq('id', targetBidId);
-
-                // Also update players table if present
-                await supabase.from('players').update({
-                    team: formData.team,
-                    role: formData.role,
-                    bid_amount: bidAmountNum
-                }).eq('name', playerNameTrimmed);
-
+                    bidAmount: bidAmountNum
+                } : b));
                 setSuccessMsg(`Draft updated: ${playerNameTrimmed} drafted to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}!`);
                 addLogEntry('UPDATED', `Updated draft for ${playerNameTrimmed} (${formData.team}, ₹${bidAmountNum.toLocaleString('en-IN')})`);
             } else {
-                // Insert new bid in team_bids table
-                const newBidRecord = {
+                const { error } = await supabase.from('team_bids').insert([{
                     player_id: playerId,
                     player_name: playerNameTrimmed,
                     team: formData.team,
                     role: formData.role,
                     bid_amount: bidAmountNum
-                };
-
-                await supabase.from('team_bids').insert([newBidRecord]);
-
-                // Also update players table if present
-                await supabase.from('players').update({
+                }]);
+                if (error) throw error;
+                setTeamBids(prev => [{
+                    id: `pending-${Date.now()}`,
+                    playerId,
+                    playerName: playerNameTrimmed,
                     team: formData.team,
                     role: formData.role,
-                    bid_amount: bidAmountNum
-                }).eq('name', playerNameTrimmed);
-
+                    bidAmount: bidAmountNum,
+                    createdAt: new Date().toISOString()
+                }, ...prev]);
                 setSuccessMsg(`Success! ${playerNameTrimmed} drafted to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}.`);
                 addLogEntry('ENTERED', `Drafted ${playerNameTrimmed} to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}`);
             }
@@ -440,10 +470,14 @@ function Admin() {
             });
             setSelectedPlayerObj(null);
 
-            await loadData();
+            // Realtime updates the other pages; this background refresh reconciles the
+            // temporary optimistic row with the database without delaying form feedback.
+            void loadData();
             window.dispatchEvent(new Event('storage'));
         } catch (err) {
             setErrorMessage(`Error saving bid to database: ${err.message}`);
+        } finally {
+            setIsSavingBid(false);
         }
     };
 
@@ -463,8 +497,10 @@ function Admin() {
     const confirmDeleteBid = async () => {
         if (!deleteConfirmBid) return;
         try {
-            await supabase.from('team_bids').delete().eq('id', deleteConfirmBid.id);
-            await supabase.from('players').update({ team: 'UNSOLD', bid_amount: 0 }).eq('name', deleteConfirmBid.playerName);
+            const { error: deleteError } = await supabase.from('team_bids').delete().eq('id', deleteConfirmBid.id);
+            if (deleteError) throw deleteError;
+            const { error: playerError } = await supabase.from('players').update({ team: 'UNSOLD', bid_amount: 0 }).eq('name', deleteConfirmBid.playerName);
+            if (playerError) throw playerError;
             addLogEntry('DELETED', `Deleted draft for ${deleteConfirmBid.playerName} (${deleteConfirmBid.team}, ₹${Number(deleteConfirmBid.bidAmount || 0).toLocaleString('en-IN')})`);
             setDeleteConfirmBid(null);
             await loadData();
@@ -477,9 +513,11 @@ function Admin() {
     const confirmClearAllBids = async () => {
         try {
             for (const b of teamBids) {
-                await supabase.from('team_bids').delete().eq('id', b.id);
+                const { error } = await supabase.from('team_bids').delete().eq('id', b.id);
+                if (error) throw error;
             }
-            await supabase.from('players').update({ team: 'UNSOLD', bid_amount: 0 }).neq('team', 'UNSOLD');
+            const { error: playerError } = await supabase.from('players').update({ team: 'UNSOLD', bid_amount: 0 }).neq('team', 'UNSOLD');
+            if (playerError) throw playerError;
             addLogEntry('DELETED', `Cleared all ${teamBids.length} franchise draft bids from database`);
             setShowClearConfirm(false);
             await loadData();
@@ -511,6 +549,10 @@ function Admin() {
             playerCount: bids.length
         };
     });
+
+    const selectedBidPlayer = selectedBidDetails
+        ? masterPlayers.find(p => (selectedBidDetails.playerId && String(p.id) === String(selectedBidDetails.playerId)) || p.name?.trim().toLowerCase() === selectedBidDetails.playerName?.trim().toLowerCase())
+        : null;
 
     if (!isAuthenticated) {
         return (
@@ -811,10 +853,11 @@ function Admin() {
 
                                 <button
                                     type="submit"
-                                    className="w-full py-4 bg-orange-500 hover:bg-orange-600 text-white font-black text-base rounded-2xl shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2 mt-2"
+                                    disabled={isSavingBid}
+                                    className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-black text-base rounded-2xl shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2 mt-2"
                                 >
-                                    <i className="fa-solid fa-floppy-disk"></i>
-                                    {editBidId ? 'Update Bid in Database' : 'Save Bid to Franchise'}
+                                    <i className={`fa-solid ${isSavingBid ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`}></i>
+                                    {isSavingBid ? 'Saving Bid...' : editBidId ? 'Update Bid in Database' : 'Save Bid to Franchise'}
                                 </button>
                             </form>
                         </div>
@@ -902,7 +945,7 @@ function Admin() {
                                         <div key={bid.id} className="p-4 flex flex-col gap-2.5 hover:bg-gray-50/60 transition">
                                             <div className="flex items-start justify-between gap-2">
                                                 <div>
-                                                    <h4 className="font-bold text-gray-900 text-sm">{bid.playerName}</h4>
+                                                    <button onClick={() => setSelectedBidDetails(bid)} className="font-bold text-gray-900 text-sm text-left hover:text-orange-600 cursor-pointer">{bid.playerName}</button>
                                                     {phone ? (
                                                         <a href={`tel:${phone}`} className="inline-flex items-center gap-1.5 text-xs text-orange-600 font-bold mt-1 bg-orange-50 px-2 py-0.5 rounded-md hover:bg-orange-100 transition">
                                                             <i className="fa-solid fa-phone text-[10px]"></i>
@@ -959,7 +1002,7 @@ function Admin() {
 
                                             return (
                                                 <tr key={bid.id} className="hover:bg-gray-50/80 transition">
-                                                    <td className="px-6 py-4 font-bold text-gray-900">{bid.playerName}</td>
+                                                    <td className="px-6 py-4"><button onClick={() => setSelectedBidDetails(bid)} className="font-bold text-gray-900 hover:text-orange-600 cursor-pointer">{bid.playerName}</button></td>
                                                     <td className="px-6 py-4">
                                                         {phone ? (
                                                             <a
@@ -1126,6 +1169,45 @@ function Admin() {
                     )}
                 </div>
             </main>
+
+            {selectedBidDetails && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setSelectedBidDetails(null)}>
+                    <section className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-start justify-between gap-4 mb-6">
+                            <div>
+                                <p className="text-xs font-bold text-orange-600 uppercase tracking-wider">Player and auction details</p>
+                                <h2 className="text-2xl font-black text-gray-900 mt-1">{selectedBidDetails.playerName}</h2>
+                            </div>
+                            <button onClick={() => setSelectedBidDetails(null)} className="w-9 h-9 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 cursor-pointer" aria-label="Close player details">
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        {selectedBidPlayer?.photo_url && <img src={selectedBidPlayer.photo_url} alt={selectedBidDetails.playerName} className="w-20 h-20 rounded-2xl object-cover mb-5" />}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {[
+                                ['Gender', selectedBidPlayer?.gender],
+                                ['Year / Batch', selectedBidPlayer?.year],
+                                ['Section', selectedBidPlayer?.section],
+                                ['Sports', selectedBidPlayer?.sports],
+                                ['Phone', selectedBidPlayer?.phone || selectedBidPlayer?.phone_no || selectedBidPlayer?.phone_number],
+                                ['Player role', selectedBidPlayer?.role],
+                                ['Player ID', selectedBidPlayer?.id],
+                                ['Player registry team', selectedBidPlayer?.team],
+                                ['Team bid', selectedBidDetails.team],
+                                ['Bid role', selectedBidDetails.role],
+                                ['Bid amount', `₹${Number(selectedBidDetails.bidAmount || 0).toLocaleString('en-IN')}`],
+                                ['Bid recorded', selectedBidDetails.createdAt ? new Date(selectedBidDetails.createdAt).toLocaleString('en-IN') : '—'],
+                                ['Photo URL', selectedBidPlayer?.photo_url || selectedBidPlayer?.photoUrl]
+                            ].map(([label, value]) => (
+                                <div key={label} className="bg-gray-50 rounded-xl p-3 min-w-0">
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{label}</div>
+                                    <div className="text-sm font-semibold text-gray-800 break-words mt-1">{value || 'Not provided'}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+            )}
 
             {/* DELETE CONFIRM MODAL */}
             {deleteConfirmBid && (

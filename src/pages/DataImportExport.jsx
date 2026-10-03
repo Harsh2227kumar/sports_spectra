@@ -7,7 +7,6 @@ import {
   checkDatabaseConnection,
   getLocalPlayersRegistry,
   saveLocalPlayersRegistry,
-  getLocalTeamBids,
   getLocalTeams,
   saveLocalTeams,
   updateCustomSupabaseCredentials,
@@ -252,16 +251,17 @@ export default function DataImportExport() {
           };
 
           for (const key of Object.keys(row)) {
-            const k = key.trim().toLowerCase();
-            const val = String(row[key] || '').trim();
-            if (k === 'name' || k === 'player name' || k === 'playername' || k === 'player') obj.name = val;
+            const k = key.replace(/^\uFEFF/, '').trim().toLowerCase();
+            const compactKey = k.replace(/[^a-z0-9]/g, '');
+            const val = String(row[key] ?? '').trim();
+            if (['name', 'playername', 'player'].includes(compactKey)) obj.name = val;
             else if (k === 'gender' || k === 'sex') {
               const char = val.toUpperCase().charAt(0);
               obj.gender = (char === 'F' || char === 'FEMALE') ? 'F' : 'M';
             }
             else if (k === 'year' || k === 'yr' || k === 'batch') obj.year = val;
             else if (k === 'section' || k === 'sec') obj.section = val;
-            else if (k === 'phone' || k === 'phone no' || k === 'phone_no' || k === 'phoneno' || k === 'phone number' || k === 'mobile' || k === 'mobile no' || k === 'contact' || k === 'contact no') {
+            else if (['phone', 'phoneno', 'phonenumber', 'mobile', 'mobileno', 'mobilenumber', 'contact', 'contactno', 'contactnumber'].includes(compactKey)) {
               obj.phone = val;
             }
             else if (k === 'sport' || k === 'sport 1' || k === 'sport1' || k === 'sports') {
@@ -442,29 +442,53 @@ export default function DataImportExport() {
     document.body.removeChild(link);
   };
 
-  const exportBidsCsv = () => {
-    const bids = getLocalTeamBids();
-    if (bids.length === 0) {
-      alert('No auction bid data available to export.');
-      return;
-    }
-    const csv = Papa.unparse(bids.map(b => ({
-      Bid_ID: sanitizeCsvCell(b.id),
-      Player_Name: sanitizeCsvCell(b.player_name),
-      Team: sanitizeCsvCell(b.team),
-      Role: sanitizeCsvCell(b.role),
-      Bid_Amount: sanitizeCsvCell(b.bid_amount),
-      Created_At: sanitizeCsvCell(b.created_at || '')
-    })));
+  const exportBidsCsv = async () => {
+    try {
+      const [bidsResult, playersResult] = await Promise.all([
+        supabase.from('team_bids').select('*'),
+        supabase.from('players').select('*')
+      ]);
+      if (bidsResult.error) throw bidsResult.error;
+      if (playersResult.error) throw playersResult.error;
+      const bids = bidsResult.data || [];
+      if (bids.length === 0) {
+        alert('No auction bid data available to export.');
+        return;
+      }
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `sports_spectra_bids_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const playersById = new Map((playersResult.data || []).filter(p => p.id).map(p => [String(p.id), p]));
+      const playersByName = new Map((playersResult.data || []).map(p => [String(p.name || '').trim().toLowerCase(), p]));
+      const csv = Papa.unparse(bids.map(b => {
+        const p = playersById.get(String(b.player_id)) || playersByName.get(String(b.player_name || '').trim().toLowerCase()) || {};
+        return {
+          Bid_ID: sanitizeCsvCell(b.id),
+          Player_ID: sanitizeCsvCell(b.player_id || p.id || ''),
+          Player_Name: sanitizeCsvCell(b.player_name || p.name || ''),
+          Gender: sanitizeCsvCell(p.gender || ''),
+          Year: sanitizeCsvCell(p.year || ''),
+          Section: sanitizeCsvCell(p.section || ''),
+          Sports: sanitizeCsvCell(p.sports || ''),
+          Phone_No: sanitizeCsvCell(p.phone_no || p.phone || p.phone_number || ''),
+          Team: sanitizeCsvCell(b.team),
+          Role: sanitizeCsvCell(b.role || p.role || 'Player'),
+          Bid_Amount: sanitizeCsvCell(b.bid_amount),
+          Photo_URL: sanitizeCsvCell(p.photo_url || p.photoUrl || ''),
+          Created_At: sanitizeCsvCell(b.created_at || '')
+        };
+      }));
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `sports_spectra_bids_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      alert(`Could not export auction bids: ${err.message || 'Database query failed.'}`);
+    }
   };
 
   // Edit Player Personal Details

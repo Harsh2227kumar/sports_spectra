@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   supabase, 
   saveLocalTeams, 
@@ -27,6 +27,8 @@ function Auction() {
     const [leaderboardGenderFilter, setLeaderboardGenderFilter] = useState('ALL');
     const [leaderboardSortBy, setLeaderboardSortBy] = useState('bid_desc');
     const [copiedPhone, setCopiedPhone] = useState(null);
+    const auctionFetchInFlight = useRef(false);
+    const auctionRefreshQueued = useRef(false);
 
 
     const handleTeamClick = (teamName) => {
@@ -38,6 +40,11 @@ function Auction() {
     };
 
     const fetchAllAuctionData = async (isBackground = false) => {
+        if (auctionFetchInFlight.current) {
+            auctionRefreshQueued.current = true;
+            return;
+        }
+        auctionFetchInFlight.current = true;
         if (!isBackground) setIsPageLoading(true);
         else setIsSyncing(true);
 
@@ -168,6 +175,11 @@ function Auction() {
         } finally {
             setIsPageLoading(false);
             setIsSyncing(false);
+            auctionFetchInFlight.current = false;
+            if (auctionRefreshQueued.current) {
+                auctionRefreshQueued.current = false;
+                queueMicrotask(() => fetchAllAuctionData(true));
+            }
         }
     };
 
@@ -188,10 +200,16 @@ function Auction() {
             fetchAllAuctionData(false);
         }, 0);
 
-        // Continuous polling (every 2.5 seconds) to detect any database changes
-        const pollInterval = setInterval(() => {
-            fetchAllAuctionData(true);
-        }, 2500);
+        // Realtime is primary; poll quickly only until its channel is healthy or if it disconnects.
+        let pollInterval = null;
+        const startFallbackPolling = () => {
+            if (!pollInterval) pollInterval = setInterval(() => fetchAllAuctionData(true), 1000);
+        };
+        const stopFallbackPolling = () => {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = null;
+        };
+        startFallbackPolling();
 
         // Instant refresh on tab focus / visibility
         const handleVisibilityOrFocus = () => {
@@ -221,7 +239,10 @@ function Auction() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'teams' }, () => {
                 fetchAllAuctionData(true);
             })
-            .subscribe();
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') stopFallbackPolling();
+                else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) startFallbackPolling();
+            });
 
         const handleStorageChange = () => {
             fetchAllAuctionData(true);
@@ -230,7 +251,7 @@ function Auction() {
 
         return () => {
             clearTimeout(initTimer);
-            clearInterval(pollInterval);
+            stopFallbackPolling();
             window.removeEventListener('focus', handleVisibilityOrFocus);
             window.removeEventListener('supabase-credentials-changed', handleCredsChanged);
             document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
