@@ -84,12 +84,12 @@ export const DEFAULT_TEAMS_DATA = [
     captain_gender: 'M',
     captain_initials: 'AM',
     captain_color: '#D6CFCB',
-    captain_photo: '',
+    captain_photo: '/Atharva Anil Masharkar.jpeg',
     vice_captain_name: 'SHRIYA YERANE',
     vice_captain_gender: 'F',
     vice_captain_initials: 'SY',
     vice_captain_color: '#2196F3',
-    vice_captain_photo: '',
+    vice_captain_photo: '/Shriya Yerane.jpeg',
     display_order: 1
   },
   {
@@ -104,12 +104,12 @@ export const DEFAULT_TEAMS_DATA = [
     captain_gender: 'M',
     captain_initials: 'CK',
     captain_color: '#FFB74D',
-    captain_photo: '',
+    captain_photo: '/Chaitanya Kharpate.JPG',
     vice_captain_name: 'Shrusti Kale',
     vice_captain_gender: 'F',
     vice_captain_initials: 'SK',
     vice_captain_color: '#BA68C8',
-    vice_captain_photo: '',
+    vice_captain_photo: '/Shrusti Kale.jpeg',
     display_order: 2
   },
   {
@@ -124,7 +124,7 @@ export const DEFAULT_TEAMS_DATA = [
     captain_gender: 'M',
     captain_initials: 'KD',
     captain_color: '#4DB6AC',
-    captain_photo: '',
+    captain_photo: '/Karan Deshmukh.jpg',
     vice_captain_name: 'Sejal Lende',
     vice_captain_gender: 'F',
     vice_captain_initials: 'SL',
@@ -144,12 +144,12 @@ export const DEFAULT_TEAMS_DATA = [
     captain_gender: 'M',
     captain_initials: 'RT',
     captain_color: '#7986CB',
-    captain_photo: '',
+    captain_photo: '/Ranvir Thakur.jpeg',
     vice_captain_name: 'Radhika Sapate',
     vice_captain_gender: 'F',
     vice_captain_initials: 'RS',
     vice_captain_color: '#FF8A65',
-    vice_captain_photo: '',
+    vice_captain_photo: '/RADHIKA SAPATE.jpeg',
     display_order: 4
   },
   {
@@ -164,12 +164,12 @@ export const DEFAULT_TEAMS_DATA = [
     captain_gender: 'M',
     captain_initials: 'AS',
     captain_color: '#E65100',
-    captain_photo: '',
+    captain_photo: '/ARNAV SAKHARKAR.jpeg',
     vice_captain_name: 'Ritisha Naigaonkar',
     vice_captain_gender: 'F',
     vice_captain_initials: 'RN',
     vice_captain_color: '#0277BD',
-    vice_captain_photo: '',
+    vice_captain_photo: '/Ritisha Naigaonkar.png',
     display_order: 5
   },
   {
@@ -184,12 +184,12 @@ export const DEFAULT_TEAMS_DATA = [
     captain_gender: 'M',
     captain_initials: 'MG',
     captain_color: '#D84315',
-    captain_photo: '',
+    captain_photo: '/Manthan Gujar.jpg',
     vice_captain_name: 'Aarya Raut',
     vice_captain_gender: 'F',
     vice_captain_initials: 'AR',
     vice_captain_color: '#C5E1A5',
-    vice_captain_photo: '',
+    vice_captain_photo: '/Aarya Raut.jpeg',
     display_order: 6
   },
   {
@@ -204,12 +204,12 @@ export const DEFAULT_TEAMS_DATA = [
     captain_gender: 'M',
     captain_initials: 'PT',
     captain_color: '#A1887F',
-    captain_photo: '',
+    captain_photo: '/Parth Tiwaskar.jpeg',
     vice_captain_name: 'Janhavi Admane',
     vice_captain_gender: 'F',
     vice_captain_initials: 'JA',
     vice_captain_color: '#F48FB1',
-    vice_captain_photo: '',
+    vice_captain_photo: '/Janhavi Admane.jpg',
     display_order: 7
   },
   {
