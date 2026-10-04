@@ -975,10 +975,38 @@ function Admin() {
                                     </div>
                                 </div>
 
+                                {/* RECENT ACTIVITY FILLER */}
+                                <div className="mt-auto bg-gray-50/50 rounded-2xl border border-gray-100 p-4">
+                                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <i className="fa-solid fa-clock-rotate-left text-gray-300"></i> Recent Drafts
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {[...teamBids].sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now())).slice(0, 3).map(b => (
+                                            <div key={b.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-[10px] border border-orange-100 shrink-0">
+                                                        {b.playerName ? b.playerName.substring(0,2).toUpperCase() : 'NA'}
+                                                    </div>
+                                                    <div>
+                                                        <div className="font-bold text-xs text-gray-900 leading-tight">{b.playerName}</div>
+                                                        <div className="text-[10px] font-medium text-gray-500 truncate max-w-[120px]">{b.team}</div>
+                                                    </div>
+                                                </div>
+                                                <div className="font-black text-green-600 text-sm bg-green-50 px-2 py-1 rounded-lg">
+                                                    ₹{Number(b.bidAmount).toLocaleString('en-IN')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {teamBids.length === 0 && (
+                                            <div className="text-xs text-gray-400 text-center py-4 font-medium border border-dashed border-gray-200 rounded-xl">No drafts yet...</div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 <button
                                     type="submit"
                                     disabled={isSavingBid}
-                                    className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-black text-base rounded-2xl shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2 mt-auto"
+                                    className="w-full py-4 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-black text-base rounded-2xl shadow-lg shadow-orange-500/20 transition cursor-pointer flex items-center justify-center gap-2 mt-3"
                                 >
                                     <i className={`fa-solid ${isSavingBid ? 'fa-spinner fa-spin' : 'fa-floppy-disk'}`}></i>
                                     {isSavingBid ? 'Saving Bid...' : editBidId ? 'Update Bid in Database' : 'Save Bid to Franchise'}
