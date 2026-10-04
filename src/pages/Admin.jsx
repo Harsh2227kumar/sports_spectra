@@ -291,7 +291,7 @@ function Admin() {
         // catches missed events and tables not included in the Supabase publication.
         let poll = null;
         const startFallbackPolling = () => {
-            if (!poll) poll = setInterval(() => { if (isAuthenticated) loadData(); }, 1000);
+            if (!poll) poll = setInterval(() => { if (isAuthenticated) loadData(); }, 10000);
         };
         const stopFallbackPolling = () => {
             if (poll) clearInterval(poll);

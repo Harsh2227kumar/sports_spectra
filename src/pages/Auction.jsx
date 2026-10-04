@@ -213,7 +213,7 @@ function Auction() {
         // Realtime in Supabase and recovers quickly from missed events.
         let pollInterval = null;
         const startFallbackPolling = () => {
-            if (!pollInterval) pollInterval = setInterval(() => fetchAllAuctionData(true), 1000);
+            if (!pollInterval) pollInterval = setInterval(() => fetchAllAuctionData(true), 10000);
         };
         const stopFallbackPolling = () => {
             if (pollInterval) clearInterval(pollInterval);
