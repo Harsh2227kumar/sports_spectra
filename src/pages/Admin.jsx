@@ -125,6 +125,10 @@ function Admin() {
     const [logSearch, setLogSearch] = useState('');
     const [isSavingLog, setIsSavingLog] = useState(false);
 
+    // Bid filter state
+    const [recordedBidSortBy, setRecordedBidSortBy] = useState('recent');
+    const [recordedBidTeamFilter, setRecordedBidTeamFilter] = useState('ALL');
+
     const addLogEntry = async (actionType, details, category = 'AUCTION') => {
         const newLog = {
             id: 'log-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
@@ -608,6 +612,22 @@ function Admin() {
         ? masterPlayers.find(p => (selectedBidDetails.playerId && String(p.id) === String(selectedBidDetails.playerId)) || p.name?.trim().toLowerCase() === selectedBidDetails.playerName?.trim().toLowerCase())
         : null;
 
+    // Apply sorting and filtering to teamBids
+    const displayBids = teamBids
+        .filter(bid => recordedBidTeamFilter === 'ALL' || bid.team === recordedBidTeamFilter)
+        .sort((a, b) => {
+            if (recordedBidSortBy === 'recent') {
+                return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+            }
+            if (recordedBidSortBy === 'highest') {
+                return Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
+            }
+            if (recordedBidSortBy === 'lowest') {
+                return Number(a.bidAmount || 0) - Number(b.bidAmount || 0);
+            }
+            return 0;
+        });
+
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
@@ -1041,17 +1061,45 @@ function Admin() {
                         )}
                     </div>
 
-                    {teamBids.length === 0 ? (
+                    <div className="p-4 sm:px-8 border-b border-gray-100 bg-gray-50/50 flex flex-wrap gap-4 items-center">
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Sort By</label>
+                            <select 
+                                value={recordedBidSortBy} 
+                                onChange={(e) => setRecordedBidSortBy(e.target.value)}
+                                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:border-orange-500 cursor-pointer"
+                            >
+                                <option value="recent">Most Recent Bid</option>
+                                <option value="highest">Highest Bid First</option>
+                                <option value="lowest">Lowest Bid First</option>
+                            </select>
+                        </div>
+                        <div className="flex-1 min-w-[200px]">
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Filter by Team</label>
+                            <select 
+                                value={recordedBidTeamFilter} 
+                                onChange={(e) => setRecordedBidTeamFilter(e.target.value)}
+                                className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-semibold focus:outline-none focus:border-orange-500 cursor-pointer"
+                            >
+                                <option value="ALL">All Franchises</option>
+                                {teamsList.map(t => (
+                                    <option key={t.name} value={t.name}>{t.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {displayBids.length === 0 ? (
                         <div className="text-center py-12 sm:py-16 text-gray-400 px-4">
                             <i className="fa-solid fa-inbox text-3xl sm:text-4xl mb-3 text-gray-300"></i>
-                            <p className="font-bold text-sm text-gray-600">No auction bids recorded in database yet.</p>
-                            <p className="text-xs mt-1">Use the form above to draft players to franchises.</p>
+                            <p className="font-bold text-sm text-gray-600">No matching bids found.</p>
+                            <p className="text-xs mt-1">Try adjusting your filters or use the form above to draft players.</p>
                         </div>
                     ) : (
                         <>
                             {/* MOBILE CARD VIEW (< md) */}
                             <div className="md:hidden divide-y divide-gray-100">
-                                {teamBids.map(bid => {
+                                {displayBids.map(bid => {
                                     const pObj = masterPlayers.find(p => p.name.toLowerCase() === bid.playerName.toLowerCase());
                                     const phone = pObj?.phone || '';
 
@@ -1110,7 +1158,7 @@ function Admin() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {teamBids.map(bid => {
+                                        {displayBids.map(bid => {
                                             const pObj = masterPlayers.find(p => p.name.toLowerCase() === bid.playerName.toLowerCase());
                                             const phone = pObj?.phone || '';
 
