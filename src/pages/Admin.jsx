@@ -75,9 +75,8 @@ function Admin() {
     const [isSavingBid, setIsSavingBid] = useState(false);
 
     // Penalty State
-    const [teamPenalties, setTeamPenalties] = useState(() => getLocalTeamPenalties());
     const [penaltyForm, setPenaltyForm] = useState({ team: getLocalTeams()[0]?.name || 'Team 1', amount: '' });
-    const [isSavingPenalty, setIsSavingPenalty] = useState(false);
+    const [isSavingAdjustment, setIsSavingAdjustment] = useState(false);
 
 
     // Autocomplete state
@@ -559,59 +558,49 @@ function Admin() {
         const bids = teamBids.filter(b => (b.team || '').toLowerCase().replace(/\s+/g, '') === team.toLowerCase().replace(/\s+/g, ''));
         const spentOnPlayers = bids.reduce((acc, b) => acc + Number(b.bidAmount || 0), 0);
         
-        // Add penalties
-        const teamPenaltyRecs = teamPenalties.filter(p => (p.team || '').toLowerCase().replace(/\s+/g, '') === team.toLowerCase().replace(/\s+/g, ''));
-        const penaltyAmount = teamPenaltyRecs.reduce((acc, p) => acc + Number(p.amount || 0), 0);
-        
-        const totalSpentAndPenalized = spentOnPlayers + penaltyAmount;
-
         return {
             name: team,
             totalPurse,
             spent: spentOnPlayers,
-            penaltyAmount,
-            totalSpentAndPenalized,
-            purseLeft: Math.max(0, totalPurse - totalSpentAndPenalized),
+            totalSpentAndPenalized: spentOnPlayers,
+            purseLeft: Math.max(0, totalPurse - spentOnPlayers),
             playerCount: bids.length
         };
     });
 
-    const handlePenaltySubmit = (e) => {
+    const handlePurseAdjustment = async (e, type) => {
         e.preventDefault();
         const amt = Number(penaltyForm.amount);
         if (isNaN(amt) || amt <= 0) {
-            setErrorMessage('Penalty amount must be greater than 0.');
+            setErrorMessage('Amount must be greater than 0.');
             return;
         }
         
-        setIsSavingPenalty(true);
-        const newPenalty = {
-            id: 'pen-' + Date.now(),
-            team: penaltyForm.team,
-            amount: amt,
-            timestamp: new Date().toISOString()
-        };
-        
-        const updatedPenalties = [newPenalty, ...teamPenalties];
-        setTeamPenalties(updatedPenalties);
-        saveLocalTeamPenalties(updatedPenalties);
-        
-        setSuccessMsg(`Penalty of ₹${amt} marked for ${penaltyForm.team}`);
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 4000);
-        addLogEntry('PENALTY', `Deducted ₹${amt} from ${penaltyForm.team} as misconduct penalty`);
-        
-        setPenaltyForm({ ...penaltyForm, amount: '' });
-        setIsSavingPenalty(false);
-        window.dispatchEvent(new Event('storage'));
-    };
+        const teamObj = teamsList.find(t => t.name === penaltyForm.team);
+        if (!teamObj) return;
 
-    const handleRemovePenalty = (id) => {
-        const updatedPenalties = teamPenalties.filter(p => p.id !== id);
-        setTeamPenalties(updatedPenalties);
-        saveLocalTeamPenalties(updatedPenalties);
-        addLogEntry('PENALTY_REMOVED', `Removed a penalty`);
-        window.dispatchEvent(new Event('storage'));
+        setIsSavingAdjustment(true);
+        try {
+            const currentPurse = Number(teamObj.total_purse || 10000);
+            const newPurse = type === 'ADD' ? currentPurse + amt : currentPurse - amt;
+
+            const { error: updateError } = await supabase.from('teams').update({ total_purse: newPurse }).eq('name', penaltyForm.team);
+            if (updateError) throw updateError;
+
+            // Log it
+            const actionText = type === 'ADD' ? `Added bonus of ₹${amt}` : `Deducted penalty of ₹${amt}`;
+            addLogEntry('UPDATED', `${actionText} for ${penaltyForm.team}`);
+            
+            setSuccessMsg(`${actionText} for ${penaltyForm.team}`);
+            setShowSuccess(true);
+            setPenaltyForm({ ...penaltyForm, amount: '' });
+            setTimeout(() => setShowSuccess(false), 4000);
+            await loadData(); // refresh teamsList
+        } catch (err) {
+            setErrorMessage(`Error adjusting purse: ${err.message}`);
+        } finally {
+            setIsSavingAdjustment(false);
+        }
     };
 
 
@@ -966,10 +955,10 @@ function Admin() {
                             </div>
                         </div>
 
-                        {/* PENALTY SYSTEM */}
-                        <div className="bg-white rounded-3xl p-8 border border-red-200 shadow-sm">
-                            <h3 className="text-xl font-black text-red-600 tracking-tight mb-4"><i className="fa-solid fa-gavel"></i> Penalty System</h3>
-                            <form onSubmit={handlePenaltySubmit} className="space-y-4">
+                        {/* PURSE ADJUSTMENT SYSTEM */}
+                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm">
+                            <h3 className="text-xl font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-scale-balanced text-orange-500"></i> Purse Adjustments</h3>
+                            <form className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
@@ -978,7 +967,7 @@ function Admin() {
                                         <select
                                             value={penaltyForm.team}
                                             onChange={(e) => setPenaltyForm({ ...penaltyForm, team: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-red-500 font-semibold text-sm bg-white cursor-pointer"
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 font-semibold text-sm bg-white cursor-pointer"
                                             required
                                         >
                                             {teamsList.map(t => (
@@ -988,7 +977,7 @@ function Admin() {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                                            Penalty Amount (₹) <span className="text-red-500">*</span>
+                                            Adjustment Amount (₹) <span className="text-red-500">*</span>
                                         </label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-gray-400 font-bold">₹</span>
@@ -998,40 +987,36 @@ function Admin() {
                                                 onChange={(e) => setPenaltyForm({ ...penaltyForm, amount: e.target.value })}
                                                 placeholder="Amount"
                                                 min="1"
-                                                className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-red-500 font-black text-sm"
+                                                className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 font-black text-sm"
                                                 required
                                             />
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={isSavingPenalty}
-                                    className="w-full py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-black text-sm rounded-xl shadow-lg shadow-red-500/20 transition cursor-pointer flex items-center justify-center gap-2"
-                                >
-                                    <i className={`fa-solid ${isSavingPenalty ? 'fa-spinner fa-spin' : 'fa-minus-circle'}`}></i>
-                                    {isSavingPenalty ? 'Saving...' : 'Deduct Penalty'}
-                                </button>
-                            </form>
-
-                            {teamPenalties.length > 0 && (
-                                <div className="mt-6">
-                                    <h4 className="text-sm font-bold text-gray-900 mb-2">Active Penalties</h4>
-                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                                        {teamPenalties.map(p => (
-                                            <div key={p.id} className="flex justify-between items-center bg-red-50/50 border border-red-100 p-2 rounded-lg">
-                                                <div className="text-xs">
-                                                    <span className="font-bold text-gray-800">{p.team}</span>
-                                                    <span className="text-red-600 font-black ml-2">-₹{p.amount}</span>
-                                                </div>
-                                                <button onClick={() => handleRemovePenalty(p.id)} className="text-red-400 hover:text-red-600 cursor-pointer">
-                                                    <i className="fa-solid fa-times"></i>
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                <div className="flex gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handlePurseAdjustment(e, 'DEDUCT')}
+                                        disabled={isSavingAdjustment}
+                                        className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-black text-sm rounded-xl shadow-lg shadow-red-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                                    >
+                                        <i className={`fa-solid ${isSavingAdjustment ? 'fa-spinner fa-spin' : 'fa-minus-circle'}`}></i>
+                                        Deduct Penalty
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handlePurseAdjustment(e, 'ADD')}
+                                        disabled={isSavingAdjustment}
+                                        className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                                    >
+                                        <i className={`fa-solid ${isSavingAdjustment ? 'fa-spinner fa-spin' : 'fa-plus-circle'}`}></i>
+                                        Add Bonus
+                                    </button>
                                 </div>
-                            )}
+                            </form>
+                            <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
+                                * Adjustments permanently modify the team's total purse limit in the database.
+                            </p>
                         </div>
                     </div>
                 </div>

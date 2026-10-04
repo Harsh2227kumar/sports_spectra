@@ -1204,14 +1204,8 @@ function Auction() {
                                                        (viceCaptainData.gender === 'F' && currentTeamData.vice_captain_name ? 1 : 0) + 
                                                        regulars.filter(p => p.gender === 'F').length;
                                     const girlsRemaining = Math.max(0, 11 - totalGirls);
-                                    const totalSpentOnPlayers = regulars.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
+                                    const totalSpent = regulars.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
                                     
-                                    // Add Penalties
-                                    const allPenalties = getLocalTeamPenalties();
-                                    const teamPenalties = allPenalties.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(activeTeam));
-                                    const totalPenalty = teamPenalties.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-                                    
-                                    const totalSpent = totalSpentOnPlayers + totalPenalty;
                                     const totalPurse = Number(currentTeamData.total_purse || 10000);
                                     const purseLeft = Math.max(0, totalPurse - totalSpent);
                                     const retainedCount = (currentTeamData.captain_name ? 1 : 0) + (currentTeamData.vice_captain_name ? 1 : 0);
