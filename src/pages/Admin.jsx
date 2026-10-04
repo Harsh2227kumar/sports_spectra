@@ -78,6 +78,10 @@ function Admin() {
     const [penaltyForm, setPenaltyForm] = useState({ team: getLocalTeams()[0]?.name || 'Team 1', amount: '' });
     const [isSavingAdjustment, setIsSavingAdjustment] = useState(false);
 
+    // Trade State
+    const [tradeForm, setTradeForm] = useState({ playerId: '', newTeam: getLocalTeams()[0]?.name || 'Team 1', tradePenalty: '' });
+    const [isProcessingTrade, setIsProcessingTrade] = useState(false);
+
 
     // Autocomplete state
     const [suggestions, setSuggestions] = useState([]);
@@ -607,6 +611,56 @@ function Admin() {
         }
     };
 
+    const handleTradePlayer = async (e) => {
+        e.preventDefault();
+        if (!tradeForm.playerId || !tradeForm.newTeam) {
+            setErrorMessage("Please select a player and a new team.");
+            return;
+        }
+        const bidToTrade = teamBids.find(b => String(b.id) === String(tradeForm.playerId));
+        if (!bidToTrade) return;
+
+        if (bidToTrade.team === tradeForm.newTeam) {
+            setErrorMessage("Player is already in this team.");
+            return;
+        }
+
+        setIsProcessingTrade(true);
+        try {
+            const { error: bidError } = await supabase.from('team_bids').update({ team: tradeForm.newTeam }).eq('id', bidToTrade.id);
+            if (bidError) throw bidError;
+            
+            if (bidToTrade.playerId) {
+                await supabase.from('players').update({ team: tradeForm.newTeam }).eq('id', bidToTrade.playerId);
+            }
+
+            let actionText = `Traded ${bidToTrade.playerName} from ${bidToTrade.team} to ${tradeForm.newTeam}`;
+
+            const penaltyAmt = Number(tradeForm.tradePenalty);
+            if (penaltyAmt > 0) {
+                const teamObj = teamsList.find(t => t.name === tradeForm.newTeam);
+                if (teamObj) {
+                    const currentPurse = Number(teamObj.total_purse || 10000);
+                    const newPurse = currentPurse - penaltyAmt;
+                    const { error: updateError } = await supabase.from('teams').update({ total_purse: newPurse }).eq('name', tradeForm.newTeam);
+                    if (updateError) throw updateError;
+                    actionText += ` (Penalty: ₹${penaltyAmt})`;
+                }
+            }
+
+            addLogEntry('TRADE', actionText);
+            setSuccessMsg(actionText);
+            setShowSuccess(true);
+            setTradeForm({ playerId: '', newTeam: teamsList[0]?.name || 'Team 1', tradePenalty: '' });
+            setTimeout(() => setShowSuccess(false), 4000);
+            await loadData();
+        } catch (err) {
+            setErrorMessage(`Error processing trade: ${err.message}`);
+        } finally {
+            setIsProcessingTrade(false);
+        }
+    };
+
 
     const selectedBidPlayer = selectedBidDetails
         ? masterPlayers.find(p => (selectedBidDetails.playerId && String(p.id) === String(selectedBidDetails.playerId)) || p.name?.trim().toLowerCase() === selectedBidDetails.playerName?.trim().toLowerCase())
@@ -1036,6 +1090,73 @@ function Admin() {
                             </form>
                             <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
                                 * Adjustments permanently modify the team's total purse limit in the database.
+                            </p>
+                        </div>
+
+                        {/* TRADE SYSTEM */}
+                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm mt-6">
+                            <h3 className="text-xl font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-right-left text-blue-500"></i> Trade Player</h3>
+                            <form onSubmit={handleTradePlayer} className="space-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            Select Player <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={tradeForm.playerId}
+                                            onChange={(e) => setTradeForm({ ...tradeForm, playerId: e.target.value })}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
+                                            required
+                                        >
+                                            <option value="" disabled>Choose Player...</option>
+                                            {[...teamBids].sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
+                                                <option key={b.id} value={b.id}>{b.playerName} ({b.team})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            New Franchise <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={tradeForm.newTeam}
+                                            onChange={(e) => setTradeForm({ ...tradeForm, newTeam: e.target.value })}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
+                                            required
+                                        >
+                                            {teamsList.map(t => (
+                                                <option key={t.name} value={t.name}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                            Trade Penalty (₹) <span className="text-gray-400 font-medium normal-case">(Optional)</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2.5 text-gray-400 font-bold">₹</span>
+                                            <input
+                                                type="number"
+                                                value={tradeForm.tradePenalty}
+                                                onChange={(e) => setTradeForm({ ...tradeForm, tradePenalty: e.target.value })}
+                                                placeholder="Amount"
+                                                min="0"
+                                                className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-black text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isProcessingTrade || !tradeForm.playerId}
+                                    className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white font-black text-sm rounded-xl shadow-lg shadow-blue-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    <i className={`fa-solid ${isProcessingTrade ? 'fa-spinner fa-spin' : 'fa-handshake'}`}></i>
+                                    {isProcessingTrade ? 'Processing Trade...' : 'Execute Trade'}
+                                </button>
+                            </form>
+                            <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
+                                * Trade penalties are permanently deducted from the <strong>new franchise's</strong> purse limit.
                             </p>
                         </div>
                     </div>
