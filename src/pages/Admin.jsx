@@ -1030,19 +1030,20 @@ function Admin() {
                             </div>
                         </div>
 
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* PURSE ADJUSTMENT SYSTEM */}
-                        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm">
-                            <h3 className="text-xl font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-scale-balanced text-orange-500"></i> Purse Adjustments</h3>
+                        <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm">
+                            <h3 className="text-lg font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-scale-balanced text-orange-500"></i> Purse Adjustments</h3>
                             <form className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-3">
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                                             Select Franchise <span className="text-red-500">*</span>
                                         </label>
                                         <select
                                             value={penaltyForm.team}
                                             onChange={(e) => setPenaltyForm({ ...penaltyForm, team: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 font-semibold text-sm bg-white cursor-pointer"
+                                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 font-semibold text-sm bg-white cursor-pointer"
                                             required
                                         >
                                             {teamsList.map(t => (
@@ -1051,98 +1052,100 @@ function Admin() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                                            Adjustment Amount (₹) <span className="text-red-500">*</span>
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                                            Amount (₹) <span className="text-red-500">*</span>
                                         </label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400 font-bold">₹</span>
+                                            <span className="absolute left-3 top-2 text-gray-400 font-bold">₹</span>
                                             <input
                                                 type="number"
                                                 value={penaltyForm.amount}
                                                 onChange={(e) => setPenaltyForm({ ...penaltyForm, amount: e.target.value })}
                                                 placeholder="Amount"
                                                 min="1"
-                                                className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 font-black text-sm"
+                                                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 font-black text-sm"
                                                 required
                                             />
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-4">
+                                <div className="flex gap-3">
                                     <button
                                         type="button"
                                         onClick={(e) => handlePurseAdjustment(e, 'DEDUCT')}
                                         disabled={isSavingAdjustment}
-                                        className="flex-1 py-3 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-black text-sm rounded-xl shadow-lg shadow-red-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                                        className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 disabled:bg-red-300 text-white font-black text-xs rounded-xl shadow-lg shadow-red-500/20 transition cursor-pointer flex items-center justify-center gap-1.5"
                                     >
                                         <i className={`fa-solid ${isSavingAdjustment ? 'fa-spinner fa-spin' : 'fa-minus-circle'}`}></i>
-                                        Deduct Penalty
+                                        Deduct
                                     </button>
                                     <button
                                         type="button"
                                         onClick={(e) => handlePurseAdjustment(e, 'ADD')}
                                         disabled={isSavingAdjustment}
-                                        className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-black text-sm rounded-xl shadow-lg shadow-emerald-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                                        className="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 transition cursor-pointer flex items-center justify-center gap-1.5"
                                     >
                                         <i className={`fa-solid ${isSavingAdjustment ? 'fa-spinner fa-spin' : 'fa-plus-circle'}`}></i>
                                         Add Bonus
                                     </button>
                                 </div>
                             </form>
-                            <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
-                                * Adjustments permanently modify the team's total purse limit in the database.
+                            <p className="text-[10px] text-gray-400 font-medium mt-3">
+                                * Permanently modifies total purse in the database.
                             </p>
                         </div>
 
                         {/* TRADE SYSTEM */}
-                        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm">
-                            <h3 className="text-xl font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-right-left text-blue-500"></i> Trade Player</h3>
+                        <div className="bg-white rounded-3xl p-6 border border-gray-200 shadow-sm">
+                            <h3 className="text-lg font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-right-left text-blue-500"></i> Trade Player</h3>
                             <form onSubmit={handleTradePlayer} className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                                            Select Player <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={tradeForm.playerId}
-                                            onChange={(e) => setTradeForm({ ...tradeForm, playerId: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
-                                            required
-                                        >
-                                            <option value="" disabled>Choose Player...</option>
-                                            {[...teamBids].sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
-                                                <option key={b.id} value={b.id}>{b.playerName} ({b.team})</option>
-                                            ))}
-                                        </select>
+                                <div className="space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                                                Player <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={tradeForm.playerId}
+                                                onChange={(e) => setTradeForm({ ...tradeForm, playerId: e.target.value })}
+                                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
+                                                required
+                                            >
+                                                <option value="" disabled>Choose...</option>
+                                                {[...teamBids].sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
+                                                    <option key={b.id} value={b.id}>{b.playerName} ({b.team})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                                                New Team <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                value={tradeForm.newTeam}
+                                                onChange={(e) => setTradeForm({ ...tradeForm, newTeam: e.target.value })}
+                                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
+                                                required
+                                            >
+                                                {teamsList.map(t => (
+                                                    <option key={t.name} value={t.name}>{t.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                                            New Franchise <span className="text-red-500">*</span>
-                                        </label>
-                                        <select
-                                            value={tradeForm.newTeam}
-                                            onChange={(e) => setTradeForm({ ...tradeForm, newTeam: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
-                                            required
-                                        >
-                                            {teamsList.map(t => (
-                                                <option key={t.name} value={t.name}>{t.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                                        <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                                             Penalty (₹) <span className="text-gray-400 font-medium normal-case">Optional</span>
                                         </label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-gray-400 font-bold">₹</span>
+                                            <span className="absolute left-3 top-2 text-gray-400 font-bold">₹</span>
                                             <input
                                                 type="number"
                                                 value={tradeForm.tradePenalty}
                                                 onChange={(e) => setTradeForm({ ...tradeForm, tradePenalty: e.target.value })}
                                                 placeholder="Amount"
                                                 min="0"
-                                                className="w-full pl-8 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-black text-sm"
+                                                className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-black text-sm"
                                             />
                                         </div>
                                     </div>
@@ -1150,15 +1153,16 @@ function Admin() {
                                 <button
                                     type="submit"
                                     disabled={isProcessingTrade || !tradeForm.playerId}
-                                    className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white font-black text-sm rounded-xl shadow-lg shadow-blue-500/20 transition cursor-pointer flex items-center justify-center gap-2"
+                                    className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white font-black text-sm rounded-xl shadow-lg shadow-blue-500/20 transition cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     <i className={`fa-solid ${isProcessingTrade ? 'fa-spinner fa-spin' : 'fa-handshake'}`}></i>
-                                    {isProcessingTrade ? 'Processing Trade...' : 'Execute Trade'}
+                                    {isProcessingTrade ? 'Processing...' : 'Execute Trade'}
                                 </button>
                             </form>
-                            <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
-                                * Trade penalties are permanently deducted from the <strong>new franchise's</strong> purse limit.
+                            <p className="text-[10px] text-gray-400 font-medium mt-3">
+                                * Penalty deducted from <strong>new franchise's</strong> purse.
                             </p>
+                        </div>
                         </div>
 
                     </div>
