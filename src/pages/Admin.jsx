@@ -981,7 +981,7 @@ function Admin() {
                                         <i className="fa-solid fa-clock-rotate-left text-gray-300"></i> Recent Drafts
                                     </h4>
                                     <div className="space-y-2">
-                                        {[...teamBids].sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now())).slice(0, 3).map(b => (
+                                        {[...teamBids].sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 3).map(b => (
                                             <div key={b.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-gray-100 shadow-2xs">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center font-bold text-[10px] border border-orange-100 shrink-0">
