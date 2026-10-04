@@ -986,8 +986,52 @@ function Admin() {
                             </form>
                         </div>
 
+                    </div>
+
+                    {/* RIGHT COLUMN: LIVE FRANCHISE PURSE OVERVIEW */}
+                    <div className="lg:col-span-6 flex flex-col gap-6">
+                        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Franchise Purse Tracker</h3>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Live Budget & Squad Count</p>
+                                </div>
+                                <span className="text-xs font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
+                                    {teamBids.length} Total Bids
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-6">
+                                {teamSpending.map(t => {
+                                    const percent = t.totalPurse > 0 ? Math.min(100, Math.round((t.spent / t.totalPurse) * 100)) : 0;
+                                    return (
+                                        <div key={t.name} className="p-3 sm:p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="font-bold text-gray-900 text-xs truncate max-w-[120px]">{t.name}</span>
+                                                <span className="text-[10px] font-bold text-gray-500">{t.playerCount} drafted</span>
+                                            </div>
+                                            <div className="flex justify-between items-baseline mb-2">
+                                                <span className="text-xs text-gray-500">Purse:</span>
+                                                <span className="font-black text-green-600 text-sm">₹{t.purseLeft.toLocaleString('en-IN')}</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${percent}%` }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="pt-4 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                                <span className="text-xs font-bold text-gray-500">Total Spent Across All Teams:</span>
+                                <span className="text-base font-black text-gray-900">
+                                    ₹{teamBids.reduce((sum, b) => sum + Number(b.bidAmount || 0), 0).toLocaleString('en-IN')}
+                                </span>
+                            </div>
+                        </div>
+
                         {/* PURSE ADJUSTMENT SYSTEM */}
-                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm">
+                        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm">
                             <h3 className="text-xl font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-scale-balanced text-orange-500"></i> Purse Adjustments</h3>
                             <form className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1051,10 +1095,10 @@ function Admin() {
                         </div>
 
                         {/* TRADE SYSTEM */}
-                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm">
+                        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm">
                             <h3 className="text-xl font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-right-left text-blue-500"></i> Trade Player</h3>
                             <form onSubmit={handleTradePlayer} className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                             Select Player <span className="text-red-500">*</span>
@@ -1088,7 +1132,7 @@ function Admin() {
                                     </div>
                                     <div>
                                         <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                                            Trade Penalty (₹) <span className="text-gray-400 font-medium normal-case">(Optional)</span>
+                                            Penalty (₹) <span className="text-gray-400 font-medium normal-case">Optional</span>
                                         </label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-2.5 text-gray-400 font-bold">₹</span>
@@ -1115,49 +1159,6 @@ function Admin() {
                             <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
                                 * Trade penalties are permanently deducted from the <strong>new franchise's</strong> purse limit.
                             </p>
-                        </div>
-                    </div>
-
-                    {/* RIGHT COLUMN: LIVE FRANCHISE PURSE OVERVIEW */}
-                    <div className="lg:col-span-6 flex flex-col gap-6">
-                        <div className="bg-white rounded-3xl p-8 border border-gray-200 shadow-sm">
-                            <div className="flex justify-between items-center mb-6">
-                                <div>
-                                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Franchise Purse Tracker</h3>
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Live Budget & Squad Count</p>
-                                </div>
-                                <span className="text-xs font-bold bg-gray-100 text-gray-600 px-3 py-1 rounded-full">
-                                    {teamBids.length} Total Bids
-                                </span>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-6">
-                                {teamSpending.map(t => {
-                                    const percent = t.totalPurse > 0 ? Math.min(100, Math.round((t.spent / t.totalPurse) * 100)) : 0;
-                                    return (
-                                        <div key={t.name} className="p-3 sm:p-3.5 bg-gray-50 rounded-2xl border border-gray-100">
-                                            <div className="flex justify-between items-center mb-1">
-                                                <span className="font-bold text-gray-900 text-xs truncate max-w-[120px]">{t.name}</span>
-                                                <span className="text-[10px] font-bold text-gray-500">{t.playerCount} drafted</span>
-                                            </div>
-                                            <div className="flex justify-between items-baseline mb-2">
-                                                <span className="text-xs text-gray-500">Purse:</span>
-                                                <span className="font-black text-green-600 text-sm">₹{t.purseLeft.toLocaleString('en-IN')}</span>
-                                            </div>
-                                            <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${percent}%` }}></div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="pt-4 border-t border-gray-100 flex items-center justify-between flex-wrap gap-2">
-                                <span className="text-xs font-bold text-gray-500">Total Spent Across All Teams:</span>
-                                <span className="text-base font-black text-gray-900">
-                                    ₹{teamBids.reduce((sum, b) => sum + Number(b.bidAmount || 0), 0).toLocaleString('en-IN')}
-                                </span>
-                            </div>
                         </div>
 
                     </div>
