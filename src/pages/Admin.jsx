@@ -79,7 +79,7 @@ function Admin() {
     const [isSavingAdjustment, setIsSavingAdjustment] = useState(false);
 
     // Trade State
-    const [tradeForm, setTradeForm] = useState({ player1Id: '', player2Id: '' });
+    const [tradeForm, setTradeForm] = useState({ player1Ids: [], player2Ids: [] });
     const [tradeSearch1, setTradeSearch1] = useState('');
     const [tradeSearch2, setTradeSearch2] = useState('');
     const [isProcessingTrade, setIsProcessingTrade] = useState(false);
@@ -615,49 +615,61 @@ function Admin() {
 
     const handleTradePlayer = async (e) => {
         e.preventDefault();
-        if (!tradeForm.player1Id || !tradeForm.player2Id) {
-            setErrorMessage("Please select two players to swap.");
+        
+        const p1 = Array.isArray(tradeForm.player1Ids) ? tradeForm.player1Ids : [];
+        const p2 = Array.isArray(tradeForm.player2Ids) ? tradeForm.player2Ids : [];
+
+        if (p1.length === 0 || p2.length === 0) {
+            setErrorMessage("Please select at least one player on both sides to swap.");
             return;
         }
 
-        if (tradeForm.player1Id === tradeForm.player2Id) {
+        const bids1 = p1.map(id => teamBids.find(b => String(b.id) === String(id))).filter(Boolean);
+        const bids2 = p2.map(id => teamBids.find(b => String(b.id) === String(id))).filter(Boolean);
+
+        if (bids1.length === 0 || bids2.length === 0) return;
+
+        const p1Ids = new Set(bids1.map(b => b.id));
+        const overlap = bids2.some(b => p1Ids.has(b.id));
+        if (overlap) {
             setErrorMessage("Cannot trade a player with themselves.");
             return;
         }
 
-        const bid1 = teamBids.find(b => String(b.id) === String(tradeForm.player1Id));
-        const bid2 = teamBids.find(b => String(b.id) === String(tradeForm.player2Id));
+        const targetTeam1 = bids2[0].team;
+        const targetTeam2 = bids1[0].team;
 
-        if (!bid1 || !bid2) return;
-
-        if (bid1.team === bid2.team) {
-            setErrorMessage("Players are already in the same team.");
+        if (targetTeam1 === targetTeam2) {
+            setErrorMessage("Players are already in the same franchise.");
             return;
         }
 
         setIsProcessingTrade(true);
         try {
-            // Swap teams in team_bids
-            const { error: bid1Error } = await supabase.from('team_bids').update({ team: bid2.team }).eq('id', bid1.id);
-            if (bid1Error) throw bid1Error;
-            
-            const { error: bid2Error } = await supabase.from('team_bids').update({ team: bid1.team }).eq('id', bid2.id);
-            if (bid2Error) throw bid2Error;
-
-            // Swap teams in players table
-            if (bid1.playerId) {
-                await supabase.from('players').update({ team: bid2.team }).eq('id', bid1.playerId);
-            }
-            if (bid2.playerId) {
-                await supabase.from('players').update({ team: bid1.team }).eq('id', bid2.playerId);
+            // Process Group 1 -> targetTeam1
+            for (const bid of bids1) {
+                const { error: bidError } = await supabase.from('team_bids').update({ team: targetTeam1 }).eq('id', bid.id);
+                if (bidError) throw bidError;
+                if (bid.playerId) {
+                    await supabase.from('players').update({ team: targetTeam1 }).eq('id', bid.playerId);
+                }
             }
 
-            let actionText = `Swapped ${bid1.playerName} (${bid1.team}) with ${bid2.playerName} (${bid2.team})`;
+            // Process Group 2 -> targetTeam2
+            for (const bid of bids2) {
+                const { error: bidError } = await supabase.from('team_bids').update({ team: targetTeam2 }).eq('id', bid.id);
+                if (bidError) throw bidError;
+                if (bid.playerId) {
+                    await supabase.from('players').update({ team: targetTeam2 }).eq('id', bid.playerId);
+                }
+            }
+
+            let actionText = `Swapped ${bids1.map(b=>b.playerName).join(', ')} (${bids1[0].team}) with ${bids2.map(b=>b.playerName).join(', ')} (${bids2[0].team})`;
 
             addLogEntry('TRADE', actionText);
             setSuccessMsg(actionText);
             setShowSuccess(true);
-            setTradeForm({ player1Id: '', player2Id: '' });
+            setTradeForm({ player1Ids: [], player2Ids: [] });
             setTradeSearch1('');
             setTradeSearch2('');
             setTimeout(() => setShowSuccess(false), 4000);
@@ -1154,22 +1166,26 @@ function Admin() {
                                         className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
                                     />
                                     <select
-                                        value={tradeForm.player1Id}
-                                        onChange={(e) => setTradeForm({ ...tradeForm, player1Id: e.target.value })}
+                                        multiple
+                                        size={4}
+                                        value={tradeForm.player1Ids}
+                                        onChange={(e) => {
+                                            const options = Array.from(e.target.selectedOptions);
+                                            setTradeForm({ ...tradeForm, player1Ids: options.map(o => o.value) });
+                                        }}
                                         className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
                                         required
                                     >
-                                        <option value="" disabled>Choose Player 1...</option>
                                         {[...teamBids]
                                             .filter(b => b.playerName.toLowerCase().includes(tradeSearch1.toLowerCase()))
                                             .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
-                                            <option key={b.id} value={b.id}>{b.playerName} ({b.team})</option>
+                                            <option key={b.id} value={b.id} className="p-1 mb-1 rounded hover:bg-blue-50">{b.playerName} ({b.team})</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
-                                        Player 2 <span className="text-red-500">*</span>
+                                        Player(s) 2 <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -1179,16 +1195,20 @@ function Admin() {
                                         className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
                                     />
                                     <select
-                                        value={tradeForm.player2Id}
-                                        onChange={(e) => setTradeForm({ ...tradeForm, player2Id: e.target.value })}
+                                        multiple
+                                        size={4}
+                                        value={tradeForm.player2Ids}
+                                        onChange={(e) => {
+                                            const options = Array.from(e.target.selectedOptions);
+                                            setTradeForm({ ...tradeForm, player2Ids: options.map(o => o.value) });
+                                        }}
                                         className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
                                         required
                                     >
-                                        <option value="" disabled>Choose Player 2...</option>
                                         {[...teamBids]
                                             .filter(b => b.playerName.toLowerCase().includes(tradeSearch2.toLowerCase()))
                                             .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
-                                            <option key={b.id} value={b.id}>{b.playerName} ({b.team})</option>
+                                            <option key={b.id} value={b.id} className="p-1 mb-1 rounded hover:bg-blue-50">{b.playerName} ({b.team})</option>
                                         ))}
                                     </select>
                                 </div>
@@ -1196,14 +1216,14 @@ function Admin() {
                             <div>
                                 <button
                                     type="submit"
-                                    disabled={isProcessingTrade || !tradeForm.player1Id || !tradeForm.player2Id}
+                                    disabled={isProcessingTrade || tradeForm.player1Ids.length === 0 || tradeForm.player2Ids.length === 0}
                                     className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white font-black text-sm rounded-xl shadow-lg shadow-blue-500/20 transition cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     <i className={`fa-solid ${isProcessingTrade ? 'fa-spinner fa-spin' : 'fa-handshake'}`}></i>
                                     {isProcessingTrade ? 'Processing Swap...' : 'Execute Swap'}
                                 </button>
                                 <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
-                                    * The assigned franchises of Player 1 and Player 2 will be swapped instantly.
+                                    * Hold <strong>Ctrl</strong> (Windows) or <strong>Cmd</strong> (Mac) while clicking to select multiple players. The assigned franchises of Group 1 and Group 2 will be swapped instantly.
                                 </p>
                             </div>
                         </form>
