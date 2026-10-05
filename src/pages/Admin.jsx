@@ -1165,23 +1165,33 @@ function Admin() {
                                         onChange={(e) => setTradeSearch1(e.target.value)}
                                         className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
                                     />
-                                    <select
-                                        multiple
-                                        size={4}
-                                        value={tradeForm.player1Ids}
-                                        onChange={(e) => {
-                                            const options = Array.from(e.target.selectedOptions);
-                                            setTradeForm({ ...tradeForm, player1Ids: options.map(o => o.value) });
-                                        }}
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
-                                        required
-                                    >
+                                    <div className="w-full h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 flex flex-col gap-1">
                                         {[...teamBids]
                                             .filter(b => b.playerName.toLowerCase().includes(tradeSearch1.toLowerCase()))
                                             .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
-                                            <option key={b.id} value={b.id} className="p-1 mb-1 rounded hover:bg-blue-50">{b.playerName} ({b.team})</option>
+                                            <div 
+                                                key={b.id} 
+                                                onClick={() => {
+                                                    setTradeForm(prev => {
+                                                        const isSelected = prev.player1Ids.includes(b.id);
+                                                        return {
+                                                            ...prev,
+                                                            player1Ids: isSelected 
+                                                                ? prev.player1Ids.filter(id => id !== b.id)
+                                                                : [...prev.player1Ids, b.id]
+                                                        };
+                                                    });
+                                                }}
+                                                className={`p-3 rounded-lg cursor-pointer text-sm font-semibold transition-all flex items-center justify-between ${tradeForm.player1Ids.includes(b.id) ? 'bg-blue-100 text-blue-800 border-2 border-blue-400 shadow-xs' : 'hover:bg-gray-50 text-gray-700 border-2 border-transparent'}`}
+                                            >
+                                                <span>{b.playerName} <span className="text-[10px] uppercase text-gray-500 font-bold ml-1">({b.team})</span></span>
+                                                {tradeForm.player1Ids.includes(b.id) && <i className="fa-solid fa-check text-blue-600"></i>}
+                                            </div>
                                         ))}
-                                    </select>
+                                        {teamBids.filter(b => b.playerName.toLowerCase().includes(tradeSearch1.toLowerCase())).length === 0 && (
+                                            <div className="text-xs text-gray-400 text-center py-4 font-bold">No players found.</div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
@@ -1194,23 +1204,33 @@ function Admin() {
                                         onChange={(e) => setTradeSearch2(e.target.value)}
                                         className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
                                     />
-                                    <select
-                                        multiple
-                                        size={4}
-                                        value={tradeForm.player2Ids}
-                                        onChange={(e) => {
-                                            const options = Array.from(e.target.selectedOptions);
-                                            setTradeForm({ ...tradeForm, player2Ids: options.map(o => o.value) });
-                                        }}
-                                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 font-semibold text-sm bg-white cursor-pointer"
-                                        required
-                                    >
+                                    <div className="w-full h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 flex flex-col gap-1">
                                         {[...teamBids]
                                             .filter(b => b.playerName.toLowerCase().includes(tradeSearch2.toLowerCase()))
                                             .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
-                                            <option key={b.id} value={b.id} className="p-1 mb-1 rounded hover:bg-blue-50">{b.playerName} ({b.team})</option>
+                                            <div 
+                                                key={b.id} 
+                                                onClick={() => {
+                                                    setTradeForm(prev => {
+                                                        const isSelected = prev.player2Ids.includes(b.id);
+                                                        return {
+                                                            ...prev,
+                                                            player2Ids: isSelected 
+                                                                ? prev.player2Ids.filter(id => id !== b.id)
+                                                                : [...prev.player2Ids, b.id]
+                                                        };
+                                                    });
+                                                }}
+                                                className={`p-3 rounded-lg cursor-pointer text-sm font-semibold transition-all flex items-center justify-between ${tradeForm.player2Ids.includes(b.id) ? 'bg-blue-100 text-blue-800 border-2 border-blue-400 shadow-xs' : 'hover:bg-gray-50 text-gray-700 border-2 border-transparent'}`}
+                                            >
+                                                <span>{b.playerName} <span className="text-[10px] uppercase text-gray-500 font-bold ml-1">({b.team})</span></span>
+                                                {tradeForm.player2Ids.includes(b.id) && <i className="fa-solid fa-check text-blue-600"></i>}
+                                            </div>
                                         ))}
-                                    </select>
+                                        {teamBids.filter(b => b.playerName.toLowerCase().includes(tradeSearch2.toLowerCase())).length === 0 && (
+                                            <div className="text-xs text-gray-400 text-center py-4 font-bold">No players found.</div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div>
@@ -1223,7 +1243,7 @@ function Admin() {
                                     {isProcessingTrade ? 'Processing Swap...' : 'Execute Swap'}
                                 </button>
                                 <p className="text-[10px] sm:text-xs text-gray-400 font-medium mt-4">
-                                    * Hold <strong>Ctrl</strong> (Windows) or <strong>Cmd</strong> (Mac) while clicking to select multiple players. The assigned franchises of Group 1 and Group 2 will be swapped instantly.
+                                    * Click on any player to select/deselect them. The assigned franchises of Group 1 and Group 2 will be swapped instantly.
                                 </p>
                             </div>
                         </form>
