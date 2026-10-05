@@ -80,6 +80,8 @@ function Admin() {
 
     // Trade State
     const [tradeForm, setTradeForm] = useState({ player1Id: '', player2Id: '' });
+    const [tradeSearch1, setTradeSearch1] = useState('');
+    const [tradeSearch2, setTradeSearch2] = useState('');
     const [isProcessingTrade, setIsProcessingTrade] = useState(false);
 
 
@@ -656,6 +658,8 @@ function Admin() {
             setSuccessMsg(actionText);
             setShowSuccess(true);
             setTradeForm({ player1Id: '', player2Id: '' });
+            setTradeSearch1('');
+            setTradeSearch2('');
             setTimeout(() => setShowSuccess(false), 4000);
             await loadData();
         } catch (err) {
@@ -1137,11 +1141,18 @@ function Admin() {
                     <div className="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-sm flex flex-col h-full">
                         <h3 className="text-xl font-black text-gray-800 tracking-tight mb-4"><i className="fa-solid fa-right-left text-blue-500"></i> Swap Players</h3>
                         <form onSubmit={handleTradePlayer} className="space-y-4 flex-1 flex flex-col justify-between">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
                                 <div>
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                         Player 1 <span className="text-red-500">*</span>
                                     </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Search Player 1..."
+                                        value={tradeSearch1}
+                                        onChange={(e) => setTradeSearch1(e.target.value)}
+                                        className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
+                                    />
                                     <select
                                         value={tradeForm.player1Id}
                                         onChange={(e) => setTradeForm({ ...tradeForm, player1Id: e.target.value })}
@@ -1149,7 +1160,9 @@ function Admin() {
                                         required
                                     >
                                         <option value="" disabled>Choose Player 1...</option>
-                                        {[...teamBids].sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
+                                        {[...teamBids]
+                                            .filter(b => b.playerName.toLowerCase().includes(tradeSearch1.toLowerCase()))
+                                            .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
                                             <option key={b.id} value={b.id}>{b.playerName} ({b.team})</option>
                                         ))}
                                     </select>
@@ -1158,6 +1171,13 @@ function Admin() {
                                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
                                         Player 2 <span className="text-red-500">*</span>
                                     </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Search Player 2..."
+                                        value={tradeSearch2}
+                                        onChange={(e) => setTradeSearch2(e.target.value)}
+                                        className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
+                                    />
                                     <select
                                         value={tradeForm.player2Id}
                                         onChange={(e) => setTradeForm({ ...tradeForm, player2Id: e.target.value })}
@@ -1165,7 +1185,9 @@ function Admin() {
                                         required
                                     >
                                         <option value="" disabled>Choose Player 2...</option>
-                                        {[...teamBids].sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
+                                        {[...teamBids]
+                                            .filter(b => b.playerName.toLowerCase().includes(tradeSearch2.toLowerCase()))
+                                            .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
                                             <option key={b.id} value={b.id}>{b.playerName} ({b.team})</option>
                                         ))}
                                     </select>
