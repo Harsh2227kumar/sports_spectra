@@ -668,21 +668,21 @@ function Admin() {
 
         setIsProcessingTrade(true);
         try {
-            // Process Group 1 -> targetTeam1 (Bid amount becomes 0)
+            // Process Group 1 -> targetTeam1
             for (const bid of bids1) {
-                const { error: bidError } = await supabase.from('team_bids').update({ team: targetTeam1, bid_amount: 0 }).eq('id', bid.id);
+                const { error: bidError } = await supabase.from('team_bids').update({ team: targetTeam1 }).eq('id', bid.id);
                 if (bidError) throw bidError;
                 if (bid.playerId) {
-                    await supabase.from('players').update({ team: targetTeam1, bid_amount: 0 }).eq('id', bid.playerId);
+                    await supabase.from('players').update({ team: targetTeam1 }).eq('id', bid.playerId);
                 }
             }
 
-            // Process Group 2 -> targetTeam2 (Bid amount becomes 0)
+            // Process Group 2 -> targetTeam2
             for (const bid of bids2) {
-                const { error: bidError } = await supabase.from('team_bids').update({ team: targetTeam2, bid_amount: 0 }).eq('id', bid.id);
+                const { error: bidError } = await supabase.from('team_bids').update({ team: targetTeam2 }).eq('id', bid.id);
                 if (bidError) throw bidError;
                 if (bid.playerId) {
-                    await supabase.from('players').update({ team: targetTeam2, bid_amount: 0 }).eq('id', bid.playerId);
+                    await supabase.from('players').update({ team: targetTeam2 }).eq('id', bid.playerId);
                 }
             }
 
@@ -702,13 +702,13 @@ function Admin() {
             const t2PurseBefore = t2PurseBase - t2Spend;
             
             // Incoming players have 0 cost, so teams only get refunded for what they sent away.
-            const t1PurseAfter = t1PurseBefore + t1ValueOut;
-            const t2PurseAfter = t2PurseBefore + t1ValueIn;
+            const t1PurseAfter = t1PurseBefore + t1ValueOut - t1ValueIn;
+            const t2PurseAfter = t2PurseBefore + t1ValueIn - t1ValueOut;
             
             const bal1Text = `${targetTeam2}: ₹${t1PurseBefore.toLocaleString('en-IN')} → ₹${t1PurseAfter.toLocaleString('en-IN')}`;
             const bal2Text = `${targetTeam1}: ₹${t2PurseBefore.toLocaleString('en-IN')} → ₹${t2PurseAfter.toLocaleString('en-IN')}`;
 
-            let actionText = `Swapped ${bids1.map(b=>b.playerName).join(', ')} (${bids1[0].team}) with ${bids2.map(b=>b.playerName).join(', ')} (${bids2[0].team}). Traded players' values set to ₹0. [${bal1Text} | ${bal2Text}]`;
+            let actionText = `Swapped ${bids1.map(b=>b.playerName).join(', ')} (${bids1[0].team}) with ${bids2.map(b=>b.playerName).join(', ')} (${bids2[0].team}) [${bal1Text} | ${bal2Text}]`;
 
             addLogEntry('TRADE', actionText);
             setSuccessMsg(actionText);
