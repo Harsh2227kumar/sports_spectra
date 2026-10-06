@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { Link } from 'react-router-dom';
 import { ADMIN_IMPORT } from '../utils/paths';
 import { formatPhotoUrl } from '../utils/photoUtils';
@@ -128,6 +129,7 @@ function Admin() {
         }));
     });
     const [logFilter, setLogFilter] = useState('ALL');
+    const [logTeamFilter, setLogTeamFilter] = useState('ALL');
     const [logSearch, setLogSearch] = useState('');
     const [isSavingLog, setIsSavingLog] = useState(false);
 
@@ -168,7 +170,8 @@ function Admin() {
         const matchesSearch = !logSearch.trim() || 
             (log.details || '').toLowerCase().includes(logSearch.toLowerCase()) || 
             (log.type || '').toLowerCase().includes(logSearch.toLowerCase());
-        return matchesType && matchesSearch;
+        const matchesTeam = logTeamFilter === 'ALL' || (log.details || '').toLowerCase().includes(logTeamFilter.toLowerCase());
+        return matchesType && matchesSearch && matchesTeam;
     });
 
     // Fetch master players and team bids directly from database
@@ -447,6 +450,15 @@ function Admin() {
                 player_name: playerNameTrimmed,
                 player_id: playerId
             };
+
+            const teamObj = teamsList.find(t => t.name === formData.team) || {};
+            const totalPurse = Number(teamObj.total_purse || 10000);
+            const otherBids = teamBids.filter(b => b.team === formData.team && b.id !== targetBidId);
+            const spentOnOthers = otherBids.reduce((acc, b) => acc + Number(b.bidAmount || 0), 0);
+            const existingTeamAmount = (existingBid && existingBid.team === formData.team) ? Number(existingBid.bidAmount) : 0;
+            const purseBefore = totalPurse - spentOnOthers - existingTeamAmount;
+            const purseAfter = totalPurse - spentOnOthers - bidAmountNum;
+            const balanceText = `(Purse: ₹${purseBefore.toLocaleString('en-IN')} → ₹${purseAfter.toLocaleString('en-IN')})`;
             if (targetBidId) {
                 const { error } = await supabase.from('team_bids').update(bidFields).eq('id', targetBidId);
                 if (error) throw error;
@@ -459,7 +471,7 @@ function Admin() {
                     bidAmount: bidAmountNum
                 } : b));
                 setSuccessMsg(`Draft updated: ${playerNameTrimmed} drafted to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}!`);
-                addLogEntry('UPDATED', `Updated draft for ${playerNameTrimmed} (${formData.team}, ₹${bidAmountNum.toLocaleString('en-IN')})`);
+                addLogEntry('UPDATED', `Updated draft for ${playerNameTrimmed} (${formData.team}, ₹${bidAmountNum.toLocaleString('en-IN')}) ${balanceText}`);
             } else {
                 const { error } = await supabase.from('team_bids').insert([{
                     player_id: playerId,
@@ -479,7 +491,7 @@ function Admin() {
                     createdAt: new Date().toISOString()
                 }, ...prev]);
                 setSuccessMsg(`Success! ${playerNameTrimmed} drafted to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}.`);
-                addLogEntry('ENTERED', `Drafted ${playerNameTrimmed} to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')}`);
+                addLogEntry('ENTERED', `Drafted ${playerNameTrimmed} to ${formData.team} for ₹${bidAmountNum.toLocaleString('en-IN')} ${balanceText}`);
             }
 
             setShowSuccess(true);
@@ -573,7 +585,7 @@ function Admin() {
             totalPurse,
             spent: spentOnPlayers,
             totalSpentAndPenalized: spentOnPlayers,
-            purseLeft: Math.max(0, totalPurse - spentOnPlayers),
+            purseLeft: totalPurse - spentOnPlayers,
             playerCount: bids.length
         };
     });
@@ -598,8 +610,14 @@ function Admin() {
             if (updateError) throw updateError;
 
             // Log it
+            const tSpend = teamSpending.find(t => t.name === penaltyForm.team);
+            const spentAmt = tSpend ? tSpend.spent : 0;
+            const purseBefore = currentPurse - spentAmt;
+            const purseAfter = newPurse - spentAmt;
+            const balanceText = `(Purse: ₹${purseBefore.toLocaleString('en-IN')} → ₹${purseAfter.toLocaleString('en-IN')})`;
+
             const actionText = type === 'ADD' ? `Added bonus of ₹${amt}` : `Deducted penalty of ₹${amt}`;
-            addLogEntry('UPDATED', `${actionText} for ${penaltyForm.team}`);
+            addLogEntry('UPDATED', `${actionText} for ${penaltyForm.team} ${balanceText}`);
             
             setSuccessMsg(`${actionText} for ${penaltyForm.team}`);
             setShowSuccess(true);
@@ -664,7 +682,28 @@ function Admin() {
                 }
             }
 
-            let actionText = `Swapped ${bids1.map(b=>b.playerName).join(', ')} (${bids1[0].team}) with ${bids2.map(b=>b.playerName).join(', ')} (${bids2[0].team})`;
+            const team1Obj = teamsList.find(t => t.name === targetTeam2) || {};
+            const team2Obj = teamsList.find(t => t.name === targetTeam1) || {};
+            
+            const t1Spend = teamSpending.find(t => t.name === targetTeam2)?.spent || 0;
+            const t2Spend = teamSpending.find(t => t.name === targetTeam1)?.spent || 0;
+            
+            const t1PurseBase = Number(team1Obj.total_purse || 10000);
+            const t2PurseBase = Number(team2Obj.total_purse || 10000);
+            
+            const t1ValueOut = bids1.reduce((sum, b) => sum + Number(b.bidAmount || 0), 0);
+            const t1ValueIn = bids2.reduce((sum, b) => sum + Number(b.bidAmount || 0), 0);
+            
+            const t1PurseBefore = t1PurseBase - t1Spend;
+            const t2PurseBefore = t2PurseBase - t2Spend;
+            
+            const t1PurseAfter = t1PurseBefore + t1ValueOut - t1ValueIn;
+            const t2PurseAfter = t2PurseBefore + t1ValueIn - t1ValueOut;
+            
+            const bal1Text = `${targetTeam2}: ₹${t1PurseBefore.toLocaleString('en-IN')} → ₹${t1PurseAfter.toLocaleString('en-IN')}`;
+            const bal2Text = `${targetTeam1}: ₹${t2PurseBefore.toLocaleString('en-IN')} → ₹${t2PurseAfter.toLocaleString('en-IN')}`;
+
+            let actionText = `Swapped ${bids1.map(b=>b.playerName).join(', ')} (${bids1[0].team}) with ${bids2.map(b=>b.playerName).join(', ')} (${bids2[0].team}) [${bal1Text} | ${bal2Text}]`;
 
             addLogEntry('TRADE', actionText);
             setSuccessMsg(actionText);
@@ -747,6 +786,47 @@ function Admin() {
         );
     }
 
+    const exportCombinedReport = () => {
+        try {
+            const wb = XLSX.utils.book_new();
+
+            const combinedData = teamBids.map((bid, index) => {
+                const playerDetails = masterPlayers.find(p => String(p.id) === String(bid.playerId)) || {};
+                return {
+                    "Sr. No.": index + 1,
+                    "Player Name": bid.playerName,
+                    "Team": bid.team,
+                    "Role": bid.role,
+                    "Bid Amount (₹)": bid.bidAmount,
+                    "Gender": playerDetails.gender || '',
+                    "Year": playerDetails.year || '',
+                    "Section": playerDetails.section || '',
+                    "Phone": playerDetails.phone || ''
+                };
+            });
+
+            const wsAll = XLSX.utils.json_to_sheet(combinedData.length > 0 ? combinedData : [{ Message: "No players found" }]);
+            XLSX.utils.book_append_sheet(wb, wsAll, "All Players");
+
+            teamsList.slice(0, 8).forEach(team => {
+                const teamPlayers = combinedData
+                    .filter(p => p["Team"] === team.name)
+                    .map((p, index) => ({
+                        ...p,
+                        "Sr. No.": index + 1
+                    }));
+                const wsTeam = XLSX.utils.json_to_sheet(teamPlayers.length > 0 ? teamPlayers : [{ Message: "No players in this team yet" }]);
+                const sheetName = team.name.substring(0, 31).replace(/[\\/?*[\]]/g, '');
+                XLSX.utils.book_append_sheet(wb, wsTeam, sheetName || 'Team');
+            });
+
+            XLSX.writeFile(wb, "Sports_Spectra_Combined_Report.xlsx");
+        } catch (error) {
+            console.error("Export error:", error);
+            alert("Failed to export report: " + error.message);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#F8FAFC] pb-24">
             {/* TOP NAVIGATION */}
@@ -766,6 +846,10 @@ function Admin() {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full md:w-auto">
+                        <button onClick={exportCombinedReport} className="px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer">
+                            <i className="fa-solid fa-file-excel text-green-600"></i>
+                            <span className="hidden xs:inline">Export Report</span>
+                        </button>
                         <button onClick={() => setShowConfigModal(true)} className="px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-700 hover:bg-gray-50 transition flex items-center gap-1.5 sm:gap-2 cursor-pointer">
                             <span className={`w-2 h-2 rounded-full ${dbStatus.connected ? 'bg-green-500' : 'bg-amber-500'}`}></span>
                             <span className="hidden xs:inline">Database</span>
@@ -1060,7 +1144,7 @@ function Admin() {
                                             </div>
                                             <div className="flex justify-between items-baseline mb-2">
                                                 <span className="text-xs text-gray-500">Purse:</span>
-                                                <span className="font-black text-green-600 text-sm">₹{t.purseLeft.toLocaleString('en-IN')}</span>
+                                                <span className={`font-black ${t.purseLeft < 0 ? 'text-red-600' : 'text-green-600'} text-sm`}>₹{t.purseLeft.toLocaleString('en-IN')}</span>
                                             </div>
                                             <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
                                                 <div className="h-full bg-orange-500 rounded-full" style={{ width: `${percent}%` }}></div>
@@ -1469,21 +1553,35 @@ function Admin() {
                         </div>
                     </div>
 
-                    {/* ACTION TYPE FILTERS */}
-                    <div className="flex items-center gap-1.5 sm:gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
-                        {['ALL', 'ENTERED', 'UPDATED', 'DELETED', 'SYSTEM'].map(type => (
-                            <button
-                                key={type}
-                                onClick={() => setLogFilter(type)}
-                                className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                                    logFilter === type 
-                                        ? 'bg-gray-900 text-white' 
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                }`}
+                    {/* ACTION TYPE & TEAM FILTERS */}
+                    <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between mb-4">
+                        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pb-1">
+                            {['ALL', 'ENTERED', 'UPDATED', 'DELETED', 'TRADE', 'SYSTEM'].map(type => (
+                                <button
+                                    key={type}
+                                    onClick={() => setLogFilter(type)}
+                                    className={`px-3 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                                        logFilter === type 
+                                            ? 'bg-gray-900 text-white' 
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    {type === 'ALL' ? 'All Activity' : type}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="shrink-0">
+                            <select
+                                value={logTeamFilter}
+                                onChange={(e) => setLogTeamFilter(e.target.value)}
+                                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 focus:outline-none focus:border-orange-500 cursor-pointer w-full sm:w-auto"
                             >
-                                {type === 'ALL' ? 'All Activity' : type}
-                            </button>
-                        ))}
+                                <option value="ALL">All Franchises</option>
+                                {teamsList.map(t => (
+                                    <option key={t.name} value={t.name}>{t.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {/* LOG ENTRIES LIST */}

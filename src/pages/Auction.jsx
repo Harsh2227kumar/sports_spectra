@@ -647,7 +647,7 @@ function Auction() {
                                             // Drafted players strictly matching this team
                                             const teamDraftedPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(team));
                                             const totalSpent = teamDraftedPlayers.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
-                                            const purseLeft = Math.max(0, totalPurse - totalSpent);
+                                            const purseLeft = totalPurse - totalSpent;
                                             const percentUsed = totalPurse > 0 ? Math.min(100, Math.round((totalSpent / totalPurse) * 100)) : 0;
                                             const logoUrl = teamObj.logo_url || '/logo1.png';
                                             const themeColor = teamObj.color || 'bg-orange-500';
@@ -682,8 +682,8 @@ function Auction() {
 
                                                     <div className="flex justify-between items-end relative z-10">
                                                         <div>
-                                                            <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Purse Left</p>
-                                                            <p className="text-lg sm:text-xl font-black text-green-500 leading-none">₹{purseLeft.toLocaleString('en-IN')}</p>
+                                                            <p className={`text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5 ${purseLeft < 0 ? 'text-red-400' : ''}`}>Purse Left</p>
+                                                            <p className={`text-lg sm:text-xl font-black ${purseLeft < 0 ? 'text-red-500' : 'text-green-500'} leading-none`}>₹{purseLeft.toLocaleString('en-IN')}</p>
                                                         </div>
                                                         <div className="text-right">
                                                             <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Spent</p>
@@ -1207,7 +1207,7 @@ function Auction() {
                                     const totalSpent = regulars.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
                                     
                                     const totalPurse = Number(currentTeamData.total_purse || 10000);
-                                    const purseLeft = Math.max(0, totalPurse - totalSpent);
+                                    const purseLeft = totalPurse - totalSpent;
                                     const retainedCount = (currentTeamData.captain_name ? 1 : 0) + (currentTeamData.vice_captain_name ? 1 : 0);
 
 
@@ -1239,8 +1239,8 @@ function Auction() {
                                                     <div className="flex-1 sm:flex-initial rounded-xl sm:rounded-[20px] px-3.5 sm:px-4.5 py-3 flex items-center gap-2.5 sm:gap-3 border border-black/5 bg-[#EBFCF5] shadow-xs">
                                                         <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white rounded-xl flex items-center justify-center text-green-500 shadow-xs shrink-0"><i className="fa-solid fa-money-bill-wave text-sm sm:text-base"></i></div>
                                                         <div>
-                                                            <p className="text-[9px] sm:text-[10px] font-extrabold text-green-500 uppercase tracking-wider whitespace-nowrap">Purse Left</p>
-                                                            <p className="text-lg sm:text-xl font-black text-green-600 leading-none mt-1 whitespace-nowrap">₹{purseLeft.toLocaleString('en-IN')}</p>
+                                                            <p className={`text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider whitespace-nowrap ${purseLeft < 0 ? 'text-red-500' : 'text-green-500'}`}>Purse Left</p>
+                                                            <p className={`text-lg sm:text-xl font-black leading-none mt-1 whitespace-nowrap ${purseLeft < 0 ? 'text-red-600' : 'text-green-600'}`}>₹{purseLeft.toLocaleString('en-IN')}</p>
                                                         </div>
                                                     </div>
                                                 </div>
