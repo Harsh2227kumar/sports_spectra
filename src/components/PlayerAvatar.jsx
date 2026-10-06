@@ -11,15 +11,18 @@ export default function PlayerAvatar({
 }) {
   const candidates = getPhotoUrlCandidates(photoUrl);
   const [candidateIndex, setCandidateIndex] = useState(0);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     setCandidateIndex(0);
+    setIsLoaded(false);
   }, [photoUrl]);
 
   const initials = getPlayerInitials(name);
   const currentSrc = candidates[candidateIndex];
 
   const handleImgError = () => {
+    setIsLoaded(false);
     if (candidateIndex < candidates.length - 1) {
       setCandidateIndex(prev => prev + 1);
     } else {
@@ -27,19 +30,31 @@ export default function PlayerAvatar({
     }
   };
 
+  const handleImgLoad = () => {
+    setIsLoaded(true);
+  };
+
   return (
-    <div className={containerClassName}>
+    <div className={`${containerClassName} relative`}>
       {currentSrc && candidateIndex < candidates.length ? (
-        <img
-          src={currentSrc}
-          alt={alt || name || 'Player avatar'}
-          className={className}
-          onError={handleImgError}
-          referrerPolicy="no-referrer"
-          loading="lazy"
-        />
+        <>
+          {!isLoaded && (
+            <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center z-0">
+                <i className="fa-solid fa-image text-gray-300/50 text-xs sm:text-sm"></i>
+            </div>
+          )}
+          <img
+            src={currentSrc}
+            alt={alt || name || 'Player avatar'}
+            className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300 relative z-10`}
+            onError={handleImgError}
+            onLoad={handleImgLoad}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+          />
+        </>
       ) : showInitialsOnFail ? (
-        <span>{initials}</span>
+        <span className="relative z-10">{initials}</span>
       ) : null}
     </div>
   );

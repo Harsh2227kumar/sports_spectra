@@ -165,14 +165,16 @@ function Admin() {
         await clearActivityLogsInSupabase();
     };
 
-    const filteredLogs = auditLogs.filter(log => {
-        const matchesType = logFilter === 'ALL' || log.type === logFilter;
-        const matchesSearch = !logSearch.trim() || 
-            (log.details || '').toLowerCase().includes(logSearch.toLowerCase()) || 
-            (log.type || '').toLowerCase().includes(logSearch.toLowerCase());
-        const matchesTeam = logTeamFilter === 'ALL' || (log.details || '').toLowerCase().includes(logTeamFilter.toLowerCase());
-        return matchesType && matchesSearch && matchesTeam;
-    });
+    const filteredLogs = React.useMemo(() => {
+        return auditLogs.filter(log => {
+            const matchesType = logFilter === 'ALL' || log.type === logFilter;
+            const matchesSearch = !logSearch.trim() || 
+                (log.details || '').toLowerCase().includes(logSearch.toLowerCase()) || 
+                (log.type || '').toLowerCase().includes(logSearch.toLowerCase());
+            const matchesTeam = logTeamFilter === 'ALL' || (log.details || '').toLowerCase().includes(logTeamFilter.toLowerCase());
+            return matchesType && matchesSearch && matchesTeam;
+        });
+    }, [auditLogs, logFilter, logSearch, logTeamFilter]);
 
     // Fetch master players and team bids directly from database
     const loadData = async () => {
@@ -574,21 +576,23 @@ function Admin() {
     };
 
     // Calculate live franchise purse spending
-    const teamSpending = teamsList.map(teamObj => {
-        const team = teamObj.name;
-        const totalPurse = Number(teamObj.total_purse || 10000);
-        const bids = teamBids.filter(b => (b.team || '').toLowerCase().replace(/\s+/g, '') === team.toLowerCase().replace(/\s+/g, ''));
-        const spentOnPlayers = bids.reduce((acc, b) => acc + Number(b.bidAmount || 0), 0);
-        
-        return {
-            name: team,
-            totalPurse,
-            spent: spentOnPlayers,
-            totalSpentAndPenalized: spentOnPlayers,
-            purseLeft: totalPurse - spentOnPlayers,
-            playerCount: bids.length
-        };
-    });
+    const teamSpending = React.useMemo(() => {
+        return teamsList.map(teamObj => {
+            const team = teamObj.name;
+            const totalPurse = Number(teamObj.total_purse || 10000);
+            const bids = teamBids.filter(b => (b.team || '').toLowerCase().replace(/\s+/g, '') === team.toLowerCase().replace(/\s+/g, ''));
+            const spentOnPlayers = bids.reduce((acc, b) => acc + Number(b.bidAmount || 0), 0);
+            
+            return {
+                name: team,
+                totalPurse,
+                spent: spentOnPlayers,
+                totalSpentAndPenalized: spentOnPlayers,
+                purseLeft: totalPurse - spentOnPlayers,
+                playerCount: bids.length
+            };
+        });
+    }, [teamsList, teamBids]);
 
     const handlePurseAdjustment = async (e, type) => {
         e.preventDefault();
@@ -726,20 +730,34 @@ function Admin() {
         : null;
 
     // Apply sorting and filtering to teamBids
-    const displayBids = teamBids
-        .filter(bid => recordedBidTeamFilter === 'ALL' || bid.team === recordedBidTeamFilter)
-        .sort((a, b) => {
-            if (recordedBidSortBy === 'recent') {
-                return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
-            }
-            if (recordedBidSortBy === 'highest') {
-                return Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
-            }
-            if (recordedBidSortBy === 'lowest') {
-                return Number(a.bidAmount || 0) - Number(b.bidAmount || 0);
-            }
-            return 0;
-        });
+    const displayBids = React.useMemo(() => {
+        return teamBids
+            .filter(bid => recordedBidTeamFilter === 'ALL' || bid.team === recordedBidTeamFilter)
+            .sort((a, b) => {
+                if (recordedBidSortBy === 'recent') {
+                    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+                }
+                if (recordedBidSortBy === 'highest') {
+                    return Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
+                }
+                if (recordedBidSortBy === 'lowest') {
+                    return Number(a.bidAmount || 0) - Number(b.bidAmount || 0);
+                }
+                return 0;
+            });
+    }, [teamBids, recordedBidTeamFilter, recordedBidSortBy]);
+
+    const tradeGroup1Players = React.useMemo(() => {
+        return teamBids
+            .filter(b => b.playerName.toLowerCase().includes(tradeSearch1.toLowerCase()))
+            .sort((a,b) => a.playerName.localeCompare(b.playerName));
+    }, [teamBids, tradeSearch1]);
+
+    const tradeGroup2Players = React.useMemo(() => {
+        return teamBids
+            .filter(b => b.playerName.toLowerCase().includes(tradeSearch2.toLowerCase()))
+            .sort((a,b) => a.playerName.localeCompare(b.playerName));
+    }, [teamBids, tradeSearch2]);
 
     if (!isAuthenticated) {
         return (
@@ -1250,9 +1268,7 @@ function Admin() {
                                         className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
                                     />
                                     <div className="w-full h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 flex flex-col gap-1">
-                                        {[...teamBids]
-                                            .filter(b => b.playerName.toLowerCase().includes(tradeSearch1.toLowerCase()))
-                                            .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
+                                        {tradeGroup1Players.map(b => (
                                             <div 
                                                 key={b.id} 
                                                 onClick={() => {
@@ -1272,7 +1288,7 @@ function Admin() {
                                                 {tradeForm.player1Ids.includes(b.id) && <i className="fa-solid fa-check text-blue-600"></i>}
                                             </div>
                                         ))}
-                                        {teamBids.filter(b => b.playerName.toLowerCase().includes(tradeSearch1.toLowerCase())).length === 0 && (
+                                        {tradeGroup1Players.length === 0 && (
                                             <div className="text-xs text-gray-400 text-center py-4 font-bold">No players found.</div>
                                         )}
                                     </div>
@@ -1289,9 +1305,7 @@ function Admin() {
                                         className="w-full px-4 py-2 mb-2 rounded-xl border border-gray-200 focus:outline-none focus:border-blue-500 text-sm bg-white"
                                     />
                                     <div className="w-full h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white p-2 flex flex-col gap-1">
-                                        {[...teamBids]
-                                            .filter(b => b.playerName.toLowerCase().includes(tradeSearch2.toLowerCase()))
-                                            .sort((a,b) => a.playerName.localeCompare(b.playerName)).map(b => (
+                                        {tradeGroup2Players.map(b => (
                                             <div 
                                                 key={b.id} 
                                                 onClick={() => {
@@ -1311,7 +1325,7 @@ function Admin() {
                                                 {tradeForm.player2Ids.includes(b.id) && <i className="fa-solid fa-check text-blue-600"></i>}
                                             </div>
                                         ))}
-                                        {teamBids.filter(b => b.playerName.toLowerCase().includes(tradeSearch2.toLowerCase())).length === 0 && (
+                                        {tradeGroup2Players.length === 0 && (
                                             <div className="text-xs text-gray-400 text-center py-4 font-bold">No players found.</div>
                                         )}
                                     </div>

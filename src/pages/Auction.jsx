@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   supabase, 
   saveLocalTeams, 
@@ -24,8 +24,9 @@ function Auction() {
     const [isTeamLoading, setIsTeamLoading] = useState(false);
     const [hoveredTeam, setHoveredTeam] = useState(null);
     const [dbStatus, setDbStatus] = useState({ connected: false, latency: 0, message: '' });
-    const [auctionViewTab, setAuctionViewTab] = useState('franchises'); // 'franchises' | 'leaderboard'
+    const [auctionViewTab, setAuctionViewTab] = useState(() => localStorage.getItem('sportsSpectraAuctionTab') || 'franchises'); // 'franchises' | 'leaderboard'
     const [leaderboardSearch, setLeaderboardSearch] = useState('');
+    const [localLeaderboardSearch, setLocalLeaderboardSearch] = useState('');
     const [leaderboardTeamFilter, setLeaderboardTeamFilter] = useState('ALL');
     const [leaderboardGenderFilter, setLeaderboardGenderFilter] = useState('ALL');
     const [leaderboardSortBy, setLeaderboardSortBy] = useState('bid_desc');
@@ -33,11 +34,79 @@ function Auction() {
     
     // Squad Filters
     const [squadSearch, setSquadSearch] = useState('');
+    const [localSquadSearch, setLocalSquadSearch] = useState('');
     const [squadGenderFilter, setSquadGenderFilter] = useState('ALL');
     const [squadSortBy, setSquadSortBy] = useState('bid_desc');
     
     const auctionFetchInFlight = useRef(false);
     const auctionRefreshQueued = useRef(false);
+
+    useEffect(() => {
+        localStorage.setItem('sportsSpectraAuctionTab', auctionViewTab);
+    }, [auctionViewTab]);
+
+    useEffect(() => {
+        const t = setTimeout(() => setLeaderboardSearch(localLeaderboardSearch), 250);
+        return () => clearTimeout(t);
+    }, [localLeaderboardSearch]);
+
+    useEffect(() => {
+        const t = setTimeout(() => setSquadSearch(localSquadSearch), 250);
+        return () => clearTimeout(t);
+    }, [localSquadSearch]);
+
+    // Filter all drafted regular players
+    const allDrafted = useMemo(() => {
+        return players.filter(p => p.team && p.team.trim().toUpperCase() !== 'UNSOLD');
+    }, [players]);
+
+    const teamMap = useMemo(() => {
+        const map = {};
+        teamsList.forEach(t => {
+            map[getNormalizedTeam(t.name)] = t;
+        });
+        return map;
+    }, [teamsList]);
+
+    const teamDraftsMap = useMemo(() => {
+        const map = {};
+        allDrafted.forEach(p => {
+            const teamKey = getNormalizedTeam(p.team);
+            if (!map[teamKey]) map[teamKey] = [];
+            map[teamKey].push(p);
+        });
+        return map;
+    }, [allDrafted]);
+
+    // Filter and sort for leaderboard
+    const filteredLeaderboard = useMemo(() => {
+        return allDrafted
+            .filter(p => {
+                if (!leaderboardSearch) return true;
+                const q = leaderboardSearch.toLowerCase().trim();
+                return (
+                    p.name?.toLowerCase().includes(q) ||
+                    p.phone?.toLowerCase().includes(q) ||
+                    p.team?.toLowerCase().includes(q) ||
+                    p.sports?.toLowerCase().includes(q) ||
+                    p.section?.toLowerCase().includes(q)
+                );
+            })
+            .filter(p => {
+                if (leaderboardTeamFilter === 'ALL') return true;
+                return getNormalizedTeam(p.team) === getNormalizedTeam(leaderboardTeamFilter);
+            })
+            .filter(p => {
+                if (leaderboardGenderFilter === 'ALL') return true;
+                return p.gender === leaderboardGenderFilter;
+            })
+            .sort((a, b) => {
+                if (leaderboardSortBy === 'bid_desc') return Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
+                if (leaderboardSortBy === 'bid_asc') return Number(a.bidAmount || 0) - Number(b.bidAmount || 0);
+                if (leaderboardSortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+                return 0;
+            });
+    }, [allDrafted, leaderboardSearch, leaderboardTeamFilter, leaderboardGenderFilter, leaderboardSortBy]);
 
 
     const handleTeamClick = (teamName) => {
@@ -364,7 +433,7 @@ function Auction() {
                         !activeTeam && auctionViewTab === 'leaderboard' ? 'bg-amber-500 text-white shadow-xs' : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
                     }`}
                 >
-                    <i className="fa-solid fa-trophy text-[10px] text-amber-500"></i> Leaderboard ({players.filter(p => p.team && p.team !== 'UNSOLD').length})
+                    <i className="fa-solid fa-trophy text-[10px] text-amber-500"></i> Leaderboard ({allDrafted.length})
                 </button>
                 {teamsList.map(teamObj => {
                     const isSelected = activeTeam === teamObj.name;
@@ -430,7 +499,7 @@ function Auction() {
                         >
                             <i className="fa-solid fa-trophy w-5 text-center text-amber-400"></i> Auction Leaderboard
                             <span className="ml-auto text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                                {players.filter(p => p.team && p.team !== 'UNSOLD').length}
+                                {allDrafted.length}
                             </span>
                         </button>
 
@@ -493,7 +562,7 @@ function Auction() {
                         <span className="relative z-10 flex items-center gap-3 font-semibold text-sm">
                             <i className="fa-solid fa-trophy w-5 text-center text-amber-400"></i> Auction Leaderboard
                             <span className="ml-auto text-[10px] bg-white/20 px-2 py-0.5 rounded-full font-bold">
-                                {players.filter(p => p.team && p.team !== 'UNSOLD').length}
+                                {allDrafted.length}
                             </span>
                         </span>
                     </a>
@@ -593,7 +662,7 @@ function Auction() {
                                         }`}
                                     >
                                         <i className="fa-solid fa-trophy text-[11px] text-amber-500"></i>
-                                        <span>Leaderboard ({players.filter(p => p.team && p.team !== 'UNSOLD').length})</span>
+                                        <span>Leaderboard ({allDrafted.length})</span>
                                     </button>
                                 </div>
 
@@ -645,7 +714,7 @@ function Auction() {
                                             const totalPurse = Number(teamObj.total_purse || 10000);
                                             
                                             // Drafted players strictly matching this team
-                                            const teamDraftedPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(team));
+                                            const teamDraftedPlayers = teamDraftsMap[getNormalizedTeam(team)] || [];
                                             const totalSpent = teamDraftedPlayers.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
                                             const purseLeft = totalPurse - totalSpent;
                                             const percentUsed = totalPurse > 0 ? Math.min(100, Math.round((totalSpent / totalPurse) * 100)) : 0;
@@ -712,37 +781,6 @@ function Auction() {
                         {auctionViewTab === 'leaderboard' && (
                             <div className="flex flex-col gap-6">
                                 {(() => {
-                                    // Filter all drafted regular players
-                                    const allDrafted = players.filter(p => p.team && p.team.trim().toUpperCase() !== 'UNSOLD');
-
-                                    // Filter and sort for leaderboard
-                                    const filteredLeaderboard = allDrafted
-                                        .filter(p => {
-                                            if (!leaderboardSearch) return true;
-                                            const q = leaderboardSearch.toLowerCase().trim();
-                                            return (
-                                                p.name?.toLowerCase().includes(q) ||
-                                                p.phone?.toLowerCase().includes(q) ||
-                                                p.team?.toLowerCase().includes(q) ||
-                                                p.sports?.toLowerCase().includes(q) ||
-                                                p.section?.toLowerCase().includes(q)
-                                            );
-                                        })
-                                        .filter(p => {
-                                            if (leaderboardTeamFilter === 'ALL') return true;
-                                            return getNormalizedTeam(p.team) === getNormalizedTeam(leaderboardTeamFilter);
-                                        })
-                                        .filter(p => {
-                                            if (leaderboardGenderFilter === 'ALL') return true;
-                                            return p.gender === leaderboardGenderFilter;
-                                        })
-                                        .sort((a, b) => {
-                                            if (leaderboardSortBy === 'bid_desc') return Number(b.bidAmount || 0) - Number(a.bidAmount || 0);
-                                            if (leaderboardSortBy === 'bid_asc') return Number(a.bidAmount || 0) - Number(b.bidAmount || 0);
-                                            if (leaderboardSortBy === 'name') return (a.name || '').localeCompare(b.name || '');
-                                            return 0;
-                                        });
-
                                     const totalSpentAcrossAll = allDrafted.reduce((sum, p) => sum + Number(p.bidAmount || 0), 0);
                                     const highestBidAmount = allDrafted.length > 0 ? Math.max(...allDrafted.map(p => Number(p.bidAmount || 0))) : 0;
                                     const avgBidAmount = allDrafted.length > 0 ? Math.round(totalSpentAcrossAll / allDrafted.length) : 0;
@@ -804,14 +842,14 @@ function Auction() {
                                                     <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-gray-400 text-xs"></i>
                                                     <input
                                                         type="text"
-                                                        value={leaderboardSearch}
-                                                        onChange={(e) => setLeaderboardSearch(e.target.value)}
+                                                        value={localLeaderboardSearch}
+                                                        onChange={(e) => setLocalLeaderboardSearch(e.target.value)}
                                                         placeholder="Search player name, phone, sports..."
                                                         className="w-full pl-9 pr-8 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold rounded-xl border border-gray-200 focus:outline-none focus:border-orange-500 bg-gray-50/50"
                                                     />
-                                                    {leaderboardSearch && (
+                                                    {localLeaderboardSearch && (
                                                         <button 
-                                                            onClick={() => setLeaderboardSearch('')}
+                                                            onClick={() => setLocalLeaderboardSearch('')}
                                                             className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 cursor-pointer"
                                                         >
                                                             <i className="fa-solid fa-xmark text-xs"></i>
@@ -895,7 +933,7 @@ function Auction() {
                                                     {/* MOBILE LEADERBOARD CARDS (< md) */}
                                                     <div className="md:hidden flex flex-col gap-3">
                                                         {filteredLeaderboard.map((player, index) => {
-                                                            const teamObj = teamsList.find(t => getNormalizedTeam(t.name) === getNormalizedTeam(player.team));
+                                                            const teamObj = teamMap[getNormalizedTeam(player.team)];
                                                             const rankNum = index + 1;
                                                             const rankBadgeClass = rankNum === 1
                                                                 ? 'bg-amber-400 text-amber-950 font-black shadow-xs'
@@ -1004,7 +1042,7 @@ function Auction() {
                                                                 </thead>
                                                                 <tbody className="divide-y divide-gray-100">
                                                                     {filteredLeaderboard.map((player, index) => {
-                                                                        const teamObj = teamsList.find(t => getNormalizedTeam(t.name) === getNormalizedTeam(player.team));
+                                                                        const teamObj = teamMap[getNormalizedTeam(player.team)];
                                                                         const rankNum = index + 1;
                                                                         const rankBadgeClass = rankNum === 1
                                                                             ? 'bg-amber-400 text-amber-950 font-black shadow-xs'
@@ -1148,7 +1186,7 @@ function Auction() {
                         ) : (
                             <div className="w-full">
                                 {(() => {
-                                    const teamDraftedPlayers = players.filter(p => getNormalizedTeam(p.team) === getNormalizedTeam(activeTeam));
+                                    const teamDraftedPlayers = teamDraftsMap[getNormalizedTeam(activeTeam)] || [];
                                     const currentTeamData = teamsList.find(t => getNormalizedTeam(t.name) === getNormalizedTeam(activeTeam)) || {
                                         name: activeTeam,
                                         total_purse: 10000,
@@ -1270,8 +1308,8 @@ function Auction() {
                                                         <i className="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
                                                         <input
                                                             type="text"
-                                                            value={squadSearch}
-                                                            onChange={(e) => setSquadSearch(e.target.value)}
+                                                            value={localSquadSearch}
+                                                            onChange={(e) => setLocalSquadSearch(e.target.value)}
                                                             placeholder="Search players, sports..."
                                                             className="w-full pl-8 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:border-orange-500 text-xs font-semibold"
                                                         />
